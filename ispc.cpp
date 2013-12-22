@@ -456,6 +456,17 @@ Target::Target(const char *arch, const char *cpu, const char *isa, bool pic) :
         this->m_hasTranscendentals = true;
         this->m_hasGather = this->m_hasScatter = true;
     }
+    else if (!strcasecmp(isa, "cuda")) {
+        this->m_isa = Target::CUDA;
+        this->m_nativeVectorWidth = 32;
+        this->m_nativeVectorAlignment = 64;
+        this->m_vectorWidth = 32;
+        this->m_maskingIsFree = true;
+        this->m_maskBitCount = 1;
+        this->m_hasHalf = true;
+        this->m_hasTranscendentals = true;
+        this->m_hasGather = this->m_hasScatter = true;
+    }
     else if (!strcasecmp(isa, "generic-64") ||
              !strcasecmp(isa, "generic-x64")) {
         this->m_isa = Target::GENERIC;
@@ -748,7 +759,7 @@ Target::Target(const char *arch, const char *cpu, const char *isa, bool pic) :
 #endif
 
         // 2. Adjust for generic
-        if (m_isa == Target::GENERIC) {
+        if (m_isa == Target::GENERIC || m_isa == Target::CUDA) {
             // <16 x i1> vectors only need 16 bit / 2 byte alignment, so add
             // that to the regular datalayout string for IA..
             // For generic-4 target we need to treat <4 x i1> as 128 bit value
@@ -832,7 +843,7 @@ Target::SupportedTargets() {
         "avx1.1-i32x8, avx1.1-i32x16, avx1.1-i64x4 "
         "avx2-i32x8, avx2-i32x16, avx2-i64x4, "
         "generic-x1, generic-x4, generic-x8, generic-x16, "
-        "generic-x32, generic-x64";
+        "generic-x32, generic-x64, cuda";
 }
 
 
@@ -891,6 +902,8 @@ Target::ISAToString(ISA isa) {
         return "avx2";
     case Target::GENERIC:
         return "generic";
+    case Target::CUDA:
+        return "cuda";
     default:
         FATAL("Unhandled target in ISAToString()");
     }
@@ -929,6 +942,8 @@ Target::ISAToTargetString(ISA isa) {
         return "avx2-i32x8";
     case Target::GENERIC:
         return "generic-4";
+    case Target::CUDA:
+        return "cuda";
     default:
         FATAL("Unhandled target in ISAToTargetString()");
     }

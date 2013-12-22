@@ -183,7 +183,7 @@ public:
 #ifdef ISPC_ARM_ENABLED
                NEON32, NEON16, NEON8,
 #endif
-               SSE2, SSE4, AVX, AVX11, AVX2, GENERIC,
+               SSE2, SSE4, AVX, AVX11, AVX2, GENERIC, CUDA,
                NUM_ISAS };
 
     /** Initializes the given Target pointer for a target of the given

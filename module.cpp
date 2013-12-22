@@ -965,7 +965,7 @@ Module::writeOutput(OutputType outputType, const char *outFileName,
         case CXX:
             if (strcasecmp(suffix, "c") && strcasecmp(suffix, "cc") &&
                 strcasecmp(suffix, "c++") && strcasecmp(suffix, "cxx") &&
-                strcasecmp(suffix, "cpp"))
+                strcasecmp(suffix, "cpp") && (g->target->getISA() == Target::CUDA && strcasecmp(suffix, "cu")))
                 fileType = "c++";
             break;
         case Header:
@@ -1007,7 +1007,7 @@ Module::writeOutput(OutputType outputType, const char *outFileName,
     else if (outputType == Bitcode)
         return writeBitcode(module, outFileName);
     else if (outputType == CXX) {
-        if (g->target->getISA() != Target::GENERIC) {
+        if (g->target->getISA() != Target::GENERIC && g->target->getISA() != Target::CUDA) {
             Error(SourcePos(), "Only \"generic-*\" targets can be used with "
                   "C++ emission.");
             return false;
@@ -2310,7 +2310,7 @@ Module::CompileAndOutput(const char *srcFile,
         m = new Module(srcFile);
         if (m->CompileFile() == 0) {
             if (outputType == CXX) {
-                if (target == NULL || strncmp(target, "generic-", 8) != 0) {
+                if (target == NULL || (strncmp(target, "generic-", 8) != 0 && strncmp(target, "cuda", 4) != 0)) {
                     Error(SourcePos(), "When generating C++ output, one of the \"generic-*\" "
                           "targets must be used.");
                     return 1;

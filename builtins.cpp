@@ -1053,6 +1053,21 @@ DefineStdlib(SymbolTable *symbolTable, llvm::LLVMContext *ctx, llvm::Module *mod
         }
         break;
     }
+    case Target::CUDA: {
+        switch (g->target->getVectorWidth()) {
+        case 32:
+            if (runtime32) {
+                EXPORT_MODULE(builtins_bitcode_cuda_32bit);
+            }
+            else {
+                EXPORT_MODULE(builtins_bitcode_cuda_64bit);
+            }
+            break;
+        default:
+            FATAL("logic error in DefineStdlib");
+        }
+        break;
+    }
     case Target::GENERIC: {
         switch (g->target->getVectorWidth()) {
         case 4:
