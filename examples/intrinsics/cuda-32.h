@@ -1340,42 +1340,48 @@ SCATTER_GENERAL(__vec32_d,   double,  __vec32_i64, __scatter64_double)
 ///////////////////////////////////////////////////////////////////////////
 // packed load/store
 
-static FORCEINLINE int32_t __packed_load_active(int32_t *ptr, __vec32_i32 *val,
-                                                __vec32_i1 mask) {
-    int count = 0; 
-    for (int i = 0; i < 16; ++i) {
-        if ((mask.v & (1 << i)) != 0) {
-            val->v[i] = *ptr++;
-            ++count;
-        }
-    }
-    return count;
+static FORCEINLINE int32_t __packed_load_active(int32_t *ptr, __vec32_i32 *val, __vec32_i1 mask) 
+{
+  int count = 0; 
+  for (int i = 0; i < 32; i++)
+  {
+    const bool cond = mask.v && programIndex() == i;
+    if (cond)
+      val->v = *(ptr+count);
+    count += __ballot(cond) != 0;
+  }
+  return count;
 }
 
 
-static FORCEINLINE int32_t __packed_store_active(int32_t *ptr, __vec32_i32 val,
-                                                 __vec32_i1 mask) {
-    int count = 0; 
-    for (int i = 0; i < 16; ++i) {
-        if ((mask.v & (1 << i)) != 0) {
-            *ptr++ = val.v[i];
-            ++count;
-        }
-    }
-    return count;
+static FORCEINLINE int32_t __packed_store_active(int32_t *ptr, __vec32_i32 val,  __vec32_i1 mask) 
+{
+  int count = 0; 
+  for (int i = 0; i < 32; i++) 
+  {
+    const bool cond = mask.v && programIndex() == i;
+    if (cond)
+      *(ptr+count) = val.v;
+    count += __ballot(cond) != 0;
+  }
+  return count;
 }
 
 
-static FORCEINLINE int32_t __packed_store_active2(int32_t *ptr, __vec32_i32 val,
-                                                 __vec32_i1 mask) {
-    int count = 0;
-    int32_t *ptr_ = ptr;
-    for (int i = 0; i < 16; ++i) {
-        *ptr = val.v[i];
-        ptr += mask.v & 1;
-        mask.v = mask.v >> 1;
-    }
-    return ptr - ptr_;
+static FORCEINLINE int32_t __packed_store_active2(int32_t *ptr, __vec32_i32 val, __vec32_i1 mask) 
+{
+#if 0
+  int count = 0;
+  int32_t *ptr_ = ptr;
+  for (int i = 0; i < 16; ++i) {
+    *ptr = val.v[i];
+    ptr += mask.v & 1;
+    mask.v = mask.v >> 1;
+  }
+  return ptr - ptr_;
+#else
+  __packed_store_active(ptr, val, mask);
+#endif
 }
 
 
@@ -1403,42 +1409,68 @@ static FORCEINLINE int32_t __packed_store_active2(uint32_t *ptr,
 ///////////////////////////////////////////////////////////////////////////
 // aos/soa
 
-static FORCEINLINE void __soa_to_aos3_float(__vec32_f v0, __vec32_f v1, __vec32_f v2,
-                                            float *ptr) {
-    for (int i = 0; i < 16; ++i) {
-        *ptr++ = __extract_element(v0, i);
-        *ptr++ = __extract_element(v1, i);
-        *ptr++ = __extract_element(v2, i);
+static FORCEINLINE void __soa_to_aos3_float(__vec32_f v0, __vec32_f v1, __vec32_f v2, float *ptr) {
+  const count = 0;
+  for (int i = 0; i < 32; ++i) 
+  {
+    const bool cond = programIndex() == i;
+    if (cond)
+    {
+      *(ptr+3*count+0) = v0.v;
+      *(ptr+3*count+1) = v1.v;
+      *(ptr+3*count+2) = v2.v; 
     }
+    count += __ballot(cond) != 0;
+  }
 }
 
-static FORCEINLINE void __aos_to_soa3_float(float *ptr, __vec32_f *out0, __vec32_f *out1,
-                                            __vec32_f *out2) {
-    for (int i = 0; i < 16; ++i) {
-        __insert_element(out0, i, *ptr++);
-        __insert_element(out1, i, *ptr++);
-        __insert_element(out2, i, *ptr++);
+static FORCEINLINE void __aos_to_soa3_float(float *ptr, __vec32_f *out0, __vec32_f *out1, __vec32_f *out2) {
+  int count = 0;
+  for (int i = 0; i < 32; ++i)
+  {
+    const bool cond = programIndex() == i;
+    if (cond)
+    {
+      out0.v = *(ptr + 3*count + 0);
+      out1.v = *(ptr + 3*count + 1);
+      out2.v = *(ptr + 3*count + 2);
     }
+    count += __ballot(cond) != 0;
+  }
 }
 
 static FORCEINLINE void __soa_to_aos4_float(__vec32_f v0, __vec32_f v1, __vec32_f v2,
                                             __vec32_f v3, float *ptr) {
-    for (int i = 0; i < 16; ++i) {
-        *ptr++ = __extract_element(v0, i);
-        *ptr++ = __extract_element(v1, i);
-        *ptr++ = __extract_element(v2, i);
-        *ptr++ = __extract_element(v3, i);
+  const count = 0;
+  for (int i = 0; i < 32; ++i) 
+  {
+    const bool cond = programIndex() == i;
+    if (cond)
+    {
+      *(ptr+4*count+0) = v0.v;
+      *(ptr+4*count+1) = v1.v;
+      *(ptr+4*count+2) = v2.v; 
+      *(ptr+4*count+3) = v3.v; 
     }
+    count += __ballot(cond) != 0;
+  }
 }
 
 static FORCEINLINE void __aos_to_soa4_float(float *ptr, __vec32_f *out0, __vec32_f *out1,
                                             __vec32_f *out2, __vec32_f *out3) {
-    for (int i = 0; i < 16; ++i) {
-        __insert_element(out0, i, *ptr++);
-        __insert_element(out1, i, *ptr++);
-        __insert_element(out2, i, *ptr++);
-        __insert_element(out3, i, *ptr++);
+  int count = 0;
+  for (int i = 0; i < 32; ++i)
+  {
+    const bool cond = programIndex() == i;
+    if (cond)
+    {
+      out0.v = *(ptr + 4*count + 0);
+      out1.v = *(ptr + 4*count + 1);
+      out2.v = *(ptr + 4*count + 2);
+      out3.v = *(ptr + 4*count + 3);
     }
+    count += __ballot(cond) != 0;
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -1460,227 +1492,107 @@ static FORCEINLINE void __prefetch_read_uniform_nt(unsigned char *) {
 // atomics
 
 static FORCEINLINE uint32_t __atomic_add(uint32_t *p, uint32_t v) {
-#ifdef _MSC_VER
-    return InterlockedAdd((LONG volatile *)p, v) - v;
-#else
-    return __sync_fetch_and_add(p, v);
-#endif
+  return atomicAdd(p, v);
 }
 
 static FORCEINLINE uint32_t __atomic_sub(uint32_t *p, uint32_t v) {
-#ifdef _MSC_VER
-    return InterlockedAdd((LONG volatile *)p, -v) + v;
-#else
-    return __sync_fetch_and_sub(p, v);
-#endif
+  return atomicSub(p, v);
 }
 
 static FORCEINLINE uint32_t __atomic_and(uint32_t *p, uint32_t v) {
-#ifdef _MSC_VER
-    return InterlockedAnd((LONG volatile *)p, v);
-#else
-    return __sync_fetch_and_and(p, v);
-#endif
+  return atomicAnd(p, v);
 }
 
 static FORCEINLINE uint32_t __atomic_or(uint32_t *p, uint32_t v) {
-#ifdef _MSC_VER
-    return InterlockedOr((LONG volatile *)p, v);
-#else
-    return __sync_fetch_and_or(p, v);
-#endif
+  return atomicOr(p, v);
 }
 
 static FORCEINLINE uint32_t __atomic_xor(uint32_t *p, uint32_t v) {
-#ifdef _MSC_VER
-    return InterlockedXor((LONG volatile *)p, v);
-#else
-    return __sync_fetch_and_xor(p, v);
-#endif
+  return atomicXor(p, v);
 }
 
 static FORCEINLINE uint32_t __atomic_min(uint32_t *p, uint32_t v) {
-    int32_t old, min;
-    do {
-        old = *((volatile int32_t *)p);
-        min = (old < (int32_t)v) ? old : (int32_t)v;
-#ifdef _MSC_VER
-    } while (InterlockedCompareExchange((LONG volatile *)p, min, old) != old);
-#else
-    } while (__sync_bool_compare_and_swap(p, old, min) == false);
-#endif
-    return old;
+  return atomicMin((int32_t)p, (int32_t)v);
 }
 
 static FORCEINLINE uint32_t __atomic_max(uint32_t *p, uint32_t v) {
-    int32_t old, max;
-    do {
-        old = *((volatile int32_t *)p);
-        max = (old > (int32_t)v) ? old : (int32_t)v;
-#ifdef _MSC_VER
-    } while (InterlockedCompareExchange((LONG volatile *)p, max, old) != old);
-#else
-    } while (__sync_bool_compare_and_swap(p, old, max) == false);
-#endif
-    return old;
+  return atomicMax((int32_t)p, (int32_t)v);
 }
 
 static FORCEINLINE uint32_t __atomic_umin(uint32_t *p, uint32_t v) {
-    uint32_t old, min;
-    do {
-        old = *((volatile uint32_t *)p);
-        min = (old < v) ? old : v;
-#ifdef _MSC_VER
-    } while (InterlockedCompareExchange((LONG volatile *)p, min, old) != old);
-#else
-    } while (__sync_bool_compare_and_swap(p, old, min) == false);
-#endif
-    return old;
+  return atomicMin(p, v);
 }
 
 static FORCEINLINE uint32_t __atomic_umax(uint32_t *p, uint32_t v) {
-    uint32_t old, max;
-    do {
-        old = *((volatile uint32_t *)p);
-        max = (old > v) ? old : v;
-#ifdef _MSC_VER
-    } while (InterlockedCompareExchange((LONG volatile *)p, max, old) != old);
-#else
-    } while (__sync_bool_compare_and_swap(p, old, max) == false);
-#endif
-    return old;
+  return atomicMax(p, v);
 }
 
 static FORCEINLINE uint32_t __atomic_xchg(uint32_t *p, uint32_t v) {
-#ifdef _MSC_VER
-    return InterlockedExchange((LONG volatile *)p, v);
-#else
-    return __sync_lock_test_and_set(p, v);
-#endif
+  return atomicExch(p, v);
 }
 
 static FORCEINLINE uint32_t __atomic_cmpxchg(uint32_t *p, uint32_t cmpval,
                                              uint32_t newval) {
-#ifdef _MSC_VER
-    return InterlockedCompareExchange((LONG volatile *)p, newval, cmpval);
-#else
-    return __sync_val_compare_and_swap(p, cmpval, newval);
-#endif
+  return atomicCAS(p, cmpval, newval);
 }
 
 static FORCEINLINE uint64_t __atomic_add(uint64_t *p, uint64_t v) {
-#ifdef _MSC_VER
-    return InterlockedAdd64((LONGLONG volatile *)p, v) - v;
-#else
-    return __sync_fetch_and_add(p, v);
-#endif
+  return atomicAdd(p, v);
 }
 
 static FORCEINLINE uint64_t __atomic_sub(uint64_t *p, uint64_t v) {
-#ifdef _MSC_VER
-    return InterlockedAdd64((LONGLONG volatile *)p, -v) + v;
-#else
-    return __sync_fetch_and_sub(p, v);
-#endif
+  return atomicAdd(p, -v);
 }
 
 static FORCEINLINE uint64_t __atomic_and(uint64_t *p, uint64_t v) {
-#ifdef _MSC_VER
-    return InterlockedAnd64((LONGLONG volatile *)p, v) - v;
-#else
-    return __sync_fetch_and_and(p, v);
-#endif
+  return atomicAnd(p, v);
 }
 
 static FORCEINLINE uint64_t __atomic_or(uint64_t *p, uint64_t v) {
-#ifdef _MSC_VER
-    return InterlockedOr64((LONGLONG volatile *)p, v) - v;
-#else
-    return __sync_fetch_and_or(p, v);
-#endif
+  return atomicOr(p, v);
 }
 
 static FORCEINLINE uint64_t __atomic_xor(uint64_t *p, uint64_t v) {
-#ifdef _MSC_VER
-    return InterlockedXor64((LONGLONG volatile *)p, v) - v;
-#else
-    return __sync_fetch_and_xor(p, v);
-#endif
+  return atomicXor(p, v);
 }
 
 static FORCEINLINE uint64_t __atomic_min(uint64_t *p, uint64_t v) {
-    int64_t old, min;
-    do {
-        old = *((volatile int64_t *)p);
-        min = (old < (int64_t)v) ? old : (int64_t)v;
-#ifdef _MSC_VER
-    } while (InterlockedCompareExchange64((LONGLONG volatile *)p, min, old) != old);
-#else
-    } while (__sync_bool_compare_and_swap(p, old, min) == false);
-#endif
-    return old;
+  int64_t old, min;
+  do {
+    old = *((volatile int64_t *)p);
+    min = (old < (int64_t)v) ? old : (int64_t)v;
+  } while (atomicCAS(p, old, min) != old);
+  return old;
 }
 
 static FORCEINLINE uint64_t __atomic_max(uint64_t *p, uint64_t v) {
-    int64_t old, max;
-    do {
-        old = *((volatile int64_t *)p);
-        max = (old > (int64_t)v) ? old : (int64_t)v;
-#ifdef _MSC_VER
-    } while (InterlockedCompareExchange64((LONGLONG volatile *)p, max, old) != old);
-#else
-    } while (__sync_bool_compare_and_swap(p, old, max) == false);
-#endif
-    return old;
+  int64_t old, max;
+  do {
+    old = *((volatile int64_t *)p);
+    max = (old > (int64_t)v) ? old : (int64_t)v;
+  } while (atomicCAS(p, old, max) != old);
+  return old;
 }
 
 static FORCEINLINE uint64_t __atomic_umin(uint64_t *p, uint64_t v) {
-    uint64_t old, min;
-    do {
-        old = *((volatile uint64_t *)p);
-        min = (old < v) ? old : v;
-#ifdef _MSC_VER
-    } while (InterlockedCompareExchange64((LONGLONG volatile *)p, min, old) != old);
-#else
-    } while (__sync_bool_compare_and_swap(p, old, min) == false);
-#endif
-    return old;
+  return atomicMin(p, v);
 }
 
 static FORCEINLINE uint64_t __atomic_umax(uint64_t *p, uint64_t v) {
-    uint64_t old, max;
-    do {
-        old = *((volatile uint64_t *)p);
-        max = (old > v) ? old : v;
-#ifdef _MSC_VER
-    } while (InterlockedCompareExchange64((LONGLONG volatile *)p, max, old) != old);
-#else
-    } while (__sync_bool_compare_and_swap(p, old, max) == false);
-#endif
-    return old;
+  return atomicMax(p, v);
 }
 
 static FORCEINLINE uint64_t __atomic_xchg(uint64_t *p, uint64_t v) {
-#ifdef _MSC_VER
-    return InterlockedExchange64((LONGLONG volatile *)p, v);
-#else
-    return __sync_lock_test_and_set(p, v);
-#endif
+  return atomicExch(p, v);
 }
 
 static FORCEINLINE uint64_t __atomic_cmpxchg(uint64_t *p, uint64_t cmpval,
                                              uint64_t newval) {
-#ifdef _MSC_VER
-    return InterlockedCompareExchange64((LONGLONG volatile *)p, newval, cmpval);
-#else
-    return __sync_val_compare_and_swap(p, cmpval, newval);
-#endif
+  return atomicCAS(p, cmpval, newval);
 }
 
-#ifdef WIN32
-#include <windows.h>
-#define __clock __rdtsc
-#else // WIN32
+
+#if 0
 static FORCEINLINE uint64_t __clock() {
   uint32_t low, high;
 #ifdef __x86_64
@@ -1693,6 +1605,5 @@ static FORCEINLINE uint64_t __clock() {
   __asm__ __volatile__ ("rdtsc" : "=a" (low), "=d" (high));
   return (uint64_t)high << 32 | low;
 }
-
-#endif // !WIN32
+#endif
 
