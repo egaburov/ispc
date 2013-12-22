@@ -1015,7 +1015,7 @@ Module::writeOutput(OutputType outputType, const char *outFileName,
     else if (outputType == Bitcode)
         return writeBitcode(module, outFileName);
     else if (outputType == CXX) {
-        if (g->target->getISA() != Target::GENERIC) {
+        if (g->target->getISA() != Target::GENERIC && !g->target->isPTX()) {
             Error(SourcePos(), "Only \"generic-*\" targets can be used with "
                   "C++ emission.");
             return false;
@@ -2357,7 +2357,7 @@ Module::CompileAndOutput(const char *srcFile,
       m = new Module(srcFile);
       if (m->CompileFile() == 0) {
         if (outputType == CXX) {
-          if (target == NULL || strncmp(target, "generic-", 8) != 0) {
+          if (target == NULL || (strncmp(target, "generic-", 8) != 0 && strncmp(target, "nvptx64",7) != 0)) {
             Error(SourcePos(), "When generating C++ output, one of the \"generic-*\" "
                 "targets must be used.");
             return 1;
@@ -2466,7 +2466,7 @@ Module::CompileAndOutput(const char *srcFile,
         m = new Module(srcFile);
         if (m->CompileFile() == 0) {
             if (outputType == CXX) {
-                if (target == NULL || strncmp(target, "generic-", 8) != 0) {
+                if (target == NULL || (strncmp(target, "generic-", 8) != 0 && strncmp(target, "nvptx64",7) != 0)) {
                     Error(SourcePos(), "When generating C++ output, one of the \"generic-*\" "
                           "targets must be used.");
                     return 1;

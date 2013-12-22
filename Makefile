@@ -36,7 +36,7 @@
 
 # If you have your own special version of llvm and/or clang, change
 # these variables to match.
-LLVM_CONFIG=$(shell which /home/evghenii/usr/local/llvm/bin-3.2/bin/llvm-config)
+LLVM_CONFIG=$(shell which /Users/eg/usr/local/llvm/bin-3.3/bin/llvm-config)
 CLANG_INCLUDE=$(shell $(LLVM_CONFIG) --includedir)
 
 # Enable ARM by request
@@ -45,7 +45,8 @@ ARM_ENABLED=0
 
 # Add llvm bin to the path so any scripts run will go to the right llvm-config
 LLVM_BIN= $(shell $(LLVM_CONFIG) --bindir)
-export PATH:=$(LLVM_BIN):$(PATH)
+#export PATH:=$(LLVM_BIN):$(PATH)
+export PATH:=$(PATH):$(LLVM_BIN)
 
 ARCH_OS = $(shell uname)
 ifeq ($(ARCH_OS), Darwin)
