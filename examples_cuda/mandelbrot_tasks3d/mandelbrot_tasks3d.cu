@@ -86,8 +86,8 @@ mandelbrot_scanline( float x0,  float dx,
     }
 }
 
-extern "C" __global__ void
-mandelbrot_ispc( float x0,  float y0, 
+__global__ void
+mandelbrot_ispc_dev( float x0,  float y0, 
                  float x1,  float y1,
                  int width,  int height, 
                  int maxIterations,  int output[]) {
@@ -102,3 +102,15 @@ mandelbrot_ispc( float x0,  float y0,
         (x0, dx, y0, dy, width, height, xspan, yspan,  maxIterations, output);
     cudaDeviceSynchronize();
 }
+
+extern "C"
+void mandelbrot_ispc(float x0, float y0, 
+    float x1, float y1,
+    int width, int height, 
+    int maxIterations, int output[])
+{
+  mandelbrot_ispc_dev<<<1,32>>>
+    (x0,y0,x1,y1,width,height,maxIterations,output);
+  cudaDeviceSynchronize();
+}
+
