@@ -4079,8 +4079,8 @@ bool CWriter::visitBuiltinCall(llvm::CallInst &I, llvm::Intrinsic::ID ID,
 //TODO: assumptions about what consume arguments from the call are likely wrong
 //      handle communitivity
 void CWriter::visitInlineAsm(llvm::CallInst &CI) {
-  Out << "/// evghenii:: inline asm /// ";
-//  assert(!"Inline assembly not supported");
+//  Out << "/// evghenii:: inline asm /// ";
+  assert(!"Inline assembly not supported");
 }
 
 void CWriter::visitAllocaInst(llvm::AllocaInst &I) {

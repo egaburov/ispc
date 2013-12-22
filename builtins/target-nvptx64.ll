@@ -8,23 +8,32 @@ define(`WIDTH',`1')
 ;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;
-declare i32 @llvm.nvvm.read.ptx.sreg.tid.x() nounwind readnone
-declare i32 @llvm.nvvm.read.ptx.sreg.ctaid.x() nounwind readnone
-declare i32 @llvm.nvvm.read.ptx.sreg.ctaid.y() nounwind readnone
-declare i32 @llvm.nvvm.read.ptx.sreg.ctaid.z() nounwind readnone
-declare i32 @llvm.nvvm.read.ptx.sreg.nctaid.x() nounwind readnone
-declare i32 @llvm.nvvm.read.ptx.sreg.nctaid.y() nounwind readnone
-declare i32 @llvm.nvvm.read.ptx.sreg.nctaid.z() nounwind readnone
-declare i32 @llvm.nvvm.read.ptx.sreg.warpsize() nounwind readnone
+;; declare i32 @llvm.nvvm.read.ptx.sreg.tid.x() nounwind readnone
+;; declare i32 @llvm.nvvm.read.ptx.sreg.ctaid.x() nounwind readnone
+;; declare i32 @llvm.nvvm.read.ptx.sreg.ctaid.y() nounwind readnone
+;; declare i32 @llvm.nvvm.read.ptx.sreg.ctaid.z() nounwind readnone
+;; declare i32 @llvm.nvvm.read.ptx.sreg.nctaid.x() nounwind readnone
+;; declare i32 @llvm.nvvm.read.ptx.sreg.nctaid.y() nounwind readnone
+;; declare i32 @llvm.nvvm.read.ptx.sreg.nctaid.z() nounwind readnone
+;; declare i32 @llvm.nvvm.read.ptx.sreg.warpsize() nounwind readnone
+
+declare i32 @cu_tid_x() nounwind readnone
+declare i32 @cu_ctaid_x() nounwind readnone
+declare i32 @cu_ctaid_y() nounwind readnone
+declare i32 @cu_ctaid_z() nounwind readnone
+declare i32 @cu_nctaid_x() nounwind readnone
+declare i32 @cu_nctaid_y() nounwind readnone
+declare i32 @cu_nctaid_z() nounwind readnone
+declare i32 @cu_warpsize() nounwind readnone
 
 define i32 @__tid_x()  nounwind readnone alwaysinline
 {
- %tid = call i32 @llvm.nvvm.read.ptx.sreg.tid.x()
+ %tid = call i32 @cu_tid_x()
  ret i32 %tid
 }
 define i32 @__warpsize()  nounwind readnone alwaysinline
 {
-;; %tid = call i32 @llvm.nvvm.read.ptx.sreg.warpsize()
+;; %tid = call i32 @cu_warpsize()
 ;; ret i32 %tid
   ret i32 32
 }
@@ -32,75 +41,82 @@ define i32 @__warpsize()  nounwind readnone alwaysinline
 
 define i32 @__ctaid_x()  nounwind readnone alwaysinline
 {
- %bid = call i32 @llvm.nvvm.read.ptx.sreg.ctaid.x()
+ %bid = call i32 @cu_ctaid_x()
  ret i32 %bid
 }
 define i32 @__ctaid_y()  nounwind readnone alwaysinline
 {
- %bid = call i32 @llvm.nvvm.read.ptx.sreg.ctaid.y()
+ %bid = call i32 @cu_ctaid_y()
  ret i32 %bid
 }
 define i32 @__ctaid_z()  nounwind readnone alwaysinline
 {
- %bid = call i32 @llvm.nvvm.read.ptx.sreg.ctaid.z()
+ %bid = call i32 @cu_ctaid_z()
  ret i32 %bid
 }
 
 define i32 @__nctaid_x()  nounwind readnone alwaysinline
 {
- %nb = call i32 @llvm.nvvm.read.ptx.sreg.nctaid.x()
+ %nb = call i32 @cu_nctaid_x()
  ret i32 %nb
 }
 define i32 @__nctaid_y()  nounwind readnone alwaysinline
 {
- %nb = call i32 @llvm.nvvm.read.ptx.sreg.nctaid.y()
+ %nb = call i32 @cu_nctaid_y()
  ret i32 %nb
 }
 define i32 @__nctaid_z()  nounwind readnone alwaysinline
 {
- %nb = call i32 @llvm.nvvm.read.ptx.sreg.nctaid.z()
+ %nb = call i32 @cu_nctaid_z()
  ret i32 %nb
 }
-define i32 @__shfl_i32(i32, i32) nounwind readnone alwaysinline
-{
-  %shfl = tail call i32 asm sideeffect "shfl.idx.b32  $0, $1, $2, 0x1f;", "=r,r,r"(i32 %0, i32 %1) nounwind readnone alwaysinline
-  ret i32 %shfl
-}
-define float @__shfl_xor_float(float, i32) nounwind readnone alwaysinline
-{
-  %shfl = tail call float asm sideeffect "shfl.bfly.b32  $0, $1, $2, 0x1f;", "=f,f,r"(float %0, i32 %1) nounwind readnone alwaysinline
-  ret float %shfl
-}
-define i32 @__shfl_xor_i32(i32, i32) nounwind readnone alwaysinline
-{
-  %shfl = tail call i32 asm sideeffect "shfl.bfly.b32  $0, $1, $2, 0x1f;", "=r,r,r"(i32 %0, i32 %1) nounwind readnone alwaysinline
-  ret i32 %shfl
-}
-define float @__fminf(float,float) nounwind readnone alwaysinline
-{
-  %min = tail call float asm sideeffect "min.f32 $0, $1, $2;", "=f,f,f"(float %0, float %1) nounwind readnone alwaysinline
-  ret float %min
-}
-define float @__fmaxf(float,float) nounwind readnone alwaysinline
-{
-  %max = tail call float asm sideeffect "max.f32 $0, $1, $2;", "=f,f,f"(float %0, float %1) nounwind readnone alwaysinline
-  ret float %max
-}
-define i32 @__ballot(i1) nounwind readnone alwaysinline
-{
-  %conv = zext i1 %0 to i32
-  %res = tail call i32 asm sideeffect 
-      "{ .reg .pred %p1; 
-         setp.ne.u32 %p1, $1, 0; 
-         vote.ballot.b32  $0, %p1; 
-      }", "=r,r"(i32 %conv) nounwind readnone alwaysinline
-  ret i32 %res
-}
-define i32 @__lanemask_lt() nounwind readnone alwaysinline
-{
-  %mask = tail call i32 asm sideeffect "mov.u32 $0, %lanemask_lt;", "=r"() nounwind readnone alwaysinline
-  ret i32 %mask
-}
+declare i32 @__shfl_i32(i32, i32) nounwind readnone
+;; define  i32 @__shfl_i32(i32, i32) nounwind readnone alwaysinline
+;; {
+;;   %shfl = tail call i32 asm sideeffect "shfl.idx.b32  $0, $1, $2, 0x1f;", "=r,r,r"(i32 %0, i32 %1) nounwind readnone alwaysinline
+;;   ret i32 %shfl
+;; }
+declare float @__shfl_xor_float(float, i32) nounwind readnone
+;; define  float @__shfl_xor_float(float, i32) nounwind readnone alwaysinline
+;; {
+;;   %shfl = tail call float asm sideeffect "shfl.bfly.b32  $0, $1, $2, 0x1f;", "=f,f,r"(float %0, i32 %1) nounwind readnone alwaysinline
+;;   ret float %shfl
+;; }
+declare i32 @__shfl_xor_i32(i32, i32) nounwind readnone
+;; define  i32 @__shfl_xor_i32(i32, i32) nounwind readnone alwaysinline
+;; {
+;;   %shfl = tail call i32 asm sideeffect "shfl.bfly.b32  $0, $1, $2, 0x1f;", "=r,r,r"(i32 %0, i32 %1) nounwind readnone alwaysinline
+;;   ret i32 %shfl
+;; }
+declare float @__fminf(float,float) nounwind readnone 
+;; define  float @__fminf(float,float) nounwind readnone alwaysinline
+;; {
+;;   %min = tail call float asm sideeffect "min.f32 $0, $1, $2;", "=f,f,f"(float %0, float %1) nounwind readnone alwaysinline
+;;   ret float %min
+;; }
+declare float @__fmaxf(float,float) nounwind readnone 
+;; define  float @__fmaxf(float,float) nounwind readnone alwaysinline
+;; {
+;;   %max = tail call float asm sideeffect "max.f32 $0, $1, $2;", "=f,f,f"(float %0, float %1) nounwind readnone alwaysinline
+;;   ret float %max
+;; }
+declare i32 @__ballot(i1) nounwind readnone
+;; define  i32 @__ballot(i1) nounwind readnone alwaysinline
+;; {
+;;   %conv = zext i1 %0 to i32
+;;   %res = tail call i32 asm sideeffect 
+;;       "{ .reg .pred %p1; 
+;;          setp.ne.u32 %p1, $1, 0; 
+;;          vote.ballot.b32  $0, %p1; 
+;;       }", "=r,r"(i32 %conv) nounwind readnone alwaysinline
+;;   ret i32 %res
+;; }
+declare i32 @__lanemask_lt() nounwind readnone 
+;; define i32 @__lanemask_lt() nounwind readnone alwaysinline
+;; {
+;;   %mask = tail call i32 asm sideeffect "mov.u32 $0, %lanemask_lt;", "=r"() nounwind readnone alwaysinline
+;;   ret i32 %mask
+;; }
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; tasking
@@ -112,8 +128,9 @@ define i8* @ISPCAlloc(i8**, i64, i32) nounwind alwaysinline
 }
 
 ;; this call allocate parameter buffer for kernel launch
-declare i64 @cudaGetParameterBuffer(i64, i64) nounwind
-define i8* @ISPCGetParamBuffer(i8**, i64 %align, i64 %size) nounwind alwaysinline
+ declare i64 @cudaGetParameterBuffer(i64, i64) nounwind
+;; declare i8* @ISPCGetParamBuffer(i8**, i64 %align, i64 %size) nounwind 
+define i8* @ISPCGetParamBuffer(i8**, i64 %align, i64 %size) nounwind 
 {
 entry:
   %call = tail call i32 @__tid_x()
@@ -123,29 +140,31 @@ entry:
   %cmp = icmp eq i32 %and, 0
   br i1 %cmp, label %if.then, label %if.end
 
-if.then:
+  if.then:
   %ptri64tmp = call i64 @cudaGetParameterBuffer(i64 %align, i64 %size);
   br label %if.end
 
-if.end:
+  if.end:
   %ptri64 = phi i64 [ %ptri64tmp, %if.then ], [ 0, %entry ]
   %ptr = inttoptr i64 %ptri64 to i8*
   ret i8* %ptr
 }
 
 ;; this actually launches kernel a kernel
-module asm "
-.extern .func  (.param .b32 func_retval0) cudaLaunchDevice
-(
-  .param .b64 cudaLaunchDevice_param_0,
-  .param .b64 cudaLaunchDevice_param_1,
-  .param .align 4 .b8 cudaLaunchDevice_param_2[12],
-  .param .align 4 .b8 cudaLaunchDevice_param_3[12],
-  .param .b32 cudaLaunchDevice_param_4,
-  .param .b64 cudaLaunchDevice_param_5
-);
-"
-define void @ISPCLaunch(i8**, i8* %func_ptr, i8* %func_args, i32 %ntx, i32 %nty, i32 %ntz) nounwind alwaysinline
+;; module asm "
+;; .extern .func  (.param .b32 func_retval0) cudaLaunchDevice
+;; (
+;;   .param .b64 cudaLaunchDevice_param_0,
+;;   .param .b64 cudaLaunchDevice_param_1,
+;;   .param .align 4 .b8 cudaLaunchDevice_param_2[12],
+;;   .param .align 4 .b8 cudaLaunchDevice_param_3[12],
+;;   .param .b32 cudaLaunchDevice_param_4,
+;;   .param .b64 cudaLaunchDevice_param_5
+;; );
+;; "
+declare i32 @CUDALaunch(i64 %func_i64,i64 %args_i64, i32 %nbx,i32 %nty,i32 %ntz)  
+;; declare void @ISPCLaunch(i8**, i8* %func_ptr, i8* %func_args, i32 %ntx, i32 %nty, i32 %ntz) nounwind 
+define  void @ISPCLaunch(i8**, i8* %func_ptr, i8* %func_args, i32 %ntx, i32 %nty, i32 %ntz) nounwind
 {
 entry:
 ;;  only 1 lane must launch the kernel  !!!
@@ -154,8 +173,8 @@ entry:
 
 ;; nbx = (%ntx-1)/(blocksize/warpsize) + 1  for blocksize=128 & warpsize=32
   %ntxm1   = add nsw i32 %ntx, -1
-;;  %ntxm1d4 = sdiv i32 %ntxm1, 4
-  %ntxm1d4 = ashr i32 %ntxm1, 2
+  %ntxm1d4 = sdiv i32 %ntxm1, 4
+;;  %ntxm1d4 = ashr i32 %ntxm1, 2
   %nbx     = add nsw i32 %ntxm1d4, 1
   %call = tail call i32 @__tid_x()
   %call1 = tail call i32 @__warpsize()
@@ -167,44 +186,47 @@ entry:
 
 if.then:
 
- %res_tmp = call i32 asm sideeffect "{
-     .param .b64 param0;
-     st.param.b64	[param0+0], $1;
-     .param .b64 param1;
-     st.param.b64	[param1+0], $2;
-     .param .align 4 .b8 param2[12];
-     st.param.b32	[param2+0], $3; 
-     st.param.b32	[param2+4], $4; 
-     st.param.b32	[param2+8], $5; 
-     .param .align 4 .b8 param3[12];
-     st.param.b32	[param3+0], $6; 
-     st.param.b32	[param3+4], $7; 
-     st.param.b32	[param3+8], $8; 
-     .param .b32 param4;
-     st.param.b32	[param4+0], $9; 
-     .param .b64 param5;
-     st.param.b64	[param5+0], $10; 
-
-     .param .b32 retval0;
-     call.uni (retval0), 
-       cudaLaunchDevice,
-       (
-        param0, 
-        param1, 
-        param2, 
-        param3, 
-        param4, 
-        param5
-       );
-     ld.param.b32	$0, [retval0+0];
-  }
-  ", 
-"=r, l,l, r,r,r, r,r,r, r,l"(
-          i64 %func_i64,i64 %args_i64, 
-          i32 %nbx,i32 %nty,i32 %ntz, 
-          i32 128,i32 1,i32 1, i32 0,i64 0);
-  br label %if.end
-
+  %res_tmp = call i32 @CUDALaunch(
+      i64 %func_i64, i64 %args_i64,
+      i32 %nbx, i32 %nty, i32 %ntz);
+;;  %res_tmp = call i32 asm sideeffect "{
+;;      .param .b64 param0;
+;;      st.param.b64	[param0+0], $1;
+;;      .param .b64 param1;
+;;      st.param.b64	[param1+0], $2;
+;;      .param .align 4 .b8 param2[12];
+;;      st.param.b32	[param2+0], $3; 
+;;      st.param.b32	[param2+4], $4; 
+;;      st.param.b32	[param2+8], $5; 
+;;      .param .align 4 .b8 param3[12];
+;;      st.param.b32	[param3+0], $6; 
+;;      st.param.b32	[param3+4], $7; 
+;;      st.param.b32	[param3+8], $8; 
+;;      .param .b32 param4;
+;;      st.param.b32	[param4+0], $9; 
+;;      .param .b64 param5;
+;;      st.param.b64	[param5+0], $10; 
+;; 
+;;      .param .b32 retval0;
+;;      call.uni (retval0), 
+;;        cudaLaunchDevice,
+;;        (
+;;         param0, 
+;;         param1, 
+;;         param2, 
+;;         param3, 
+;;         param4, 
+;;         param5
+;;        );
+;;      ld.param.b32	$0, [retval0+0];
+;;   }
+;;   ", 
+;; "=r, l,l, r,r,r, r,r,r, r,l"(
+;;           i64 %func_i64,i64 %args_i64, 
+;;           i32 %nbx,i32 %nty,i32 %ntz, 
+;;           i32 128,i32 1,i32 1, i32 0,i64 0);
+     br label %if.end
+ 
 if.end:                                           ; preds = %if.then, %entry
 ;;  %res = phi i32 [ %res_tmp, %if.then ], [ undef, %entry ]
 
@@ -317,16 +339,17 @@ define  void
 
 declare float @llvm.convert.from.fp16(i16) nounwind readnone
 declare i16   @llvm.convert.to.fp16(float) nounwind readnone
-define float @__half_to_float_uniform(i16 %v) nounwind readnone alwaysinline
-{
-  ;; %res = call float @llvm.convert.from.fp16(i16 %v)
-  %res = tail call float asm sideeffect 
-      "{ .reg .b16 %tmp; 
-         mov.b16 %tmp, $1;
-         cvt.f32.f16 $0, %tmp;
-      }", "=f,h"(i16 %v) nounwind readnone alwaysinline
-  ret float %res
-}
+declare float @__half_to_float_uniform(i16 %v) nounwind readnone 
+;; define float @__half_to_float_uniform(i16 %v) nounwind readnone alwaysinline
+;; {
+;;   ;; %res = call float @llvm.convert.from.fp16(i16 %v)
+;;   %res = tail call float asm sideeffect 
+;;       "{ .reg .b16 %tmp; 
+;;          mov.b16 %tmp, $1;
+;;          cvt.f32.f16 $0, %tmp;
+;;       }", "=f,h"(i16 %v) nounwind readnone alwaysinline
+;;   ret float %res
+;; }
 define i16 @__float_to_half_uniform(float %v) nounwind readnone alwaysinline
 {
  ;; this will break the compiler, use inline asm similarly to above case
@@ -501,10 +524,10 @@ declare <WIDTH x double> @__max_varying_double(<WIDTH x double>,
 
 ;; sqrt/rsqrt/rcp
 
-declare float     @llvm.nvvm.rsqrt.approx.f(float %f) nounwind readonly alwaysinline
-declare float     @llvm.nvvm.sqrt.f(float %f) nounwind readonly alwaysinline
-declare double    @llvm.nvvm.rsqrt.approx.d(double %f) nounwind readonly alwaysinline
-declare double    @llvm.nvvm.sqrt.d(double %f) nounwind readonly alwaysinline
+declare float     @cu_rsqrt_approx_f(float %f) nounwind readonly alwaysinline
+declare float     @cu_sqrt_f(float %f) nounwind readonly alwaysinline
+declare double    @cu_rsqrt_approx_d(double %f) nounwind readonly alwaysinline
+declare double    @cu_sqrt_d(double %f) nounwind readonly alwaysinline
 
 ;; declare float @__rcp_uniform_float(float) nounwind readnone 
 define  float @__rcp_uniform_float(float) nounwind readonly alwaysinline {
@@ -516,14 +539,14 @@ define  float @__rcp_uniform_float(float) nounwind readonly alwaysinline {
 }
 ;; declare float @__sqrt_uniform_float(float) nounwind readnone 
 define  float @__sqrt_uniform_float(float) nounwind readonly alwaysinline {
-  %ret = call float @llvm.nvvm.sqrt.f(float %0)
+  %ret = call float @cu_sqrt_f(float %0)
 ;  %ret = tail call float asm sideeffect "sqrt.approx.ftz.f32  $0, $1;", "=f,f"(float %0) nounwind readnone alwaysinline
   ret float %ret
 }
 ;; declare float @__rsqrt_uniform_float(float) nounwind readnone 
 define  float @__rsqrt_uniform_float(float) nounwind readonly alwaysinline 
 {
-  %ret = call float @llvm.nvvm.rsqrt.approx.f(float %0)
+  %ret = call float @cu_rsqrt_approx_f(float %0)
 ;  %ret = tail call float asm sideeffect "rsqrt.approx.ftz.f32  $0, $1;", "=f,f"(float %0) nounwind readnone alwaysinline
   ret float %ret
 }
@@ -552,7 +575,7 @@ define <WIDTH x float> @__sqrt_varying_float(<WIDTH x float>) nounwind readnone 
 
 ;; declare double @__sqrt_uniform_double(double) nounwind readnone
 define  double @__sqrt_uniform_double(double) nounwind readonly alwaysinline {
-  %ret = call double @llvm.nvvm.sqrt.d(double %0)
+  %ret = call double @cu_sqrt_d(double %0)
   ret double %ret
 }
 declare <WIDTH x double> @__sqrt_varying_double(<WIDTH x double>) nounwind readnone
@@ -560,12 +583,13 @@ declare <WIDTH x double> @__sqrt_varying_double(<WIDTH x double>) nounwind readn
 ;; bit ops
 
 declare i32 @llvm.ctpop.i32(i32) nounwind readnone
-define  i32 @__popcnt_int32(i32) nounwind readonly alwaysinline {
-;;  %call = call i32 @llvm.ctpop.i32(i32 %0)
-;;  ret i32 %call
-  %res = tail call i32 asm sideeffect "popc.b32 $0, $1;", "=r,r"(i32 %0) nounwind readnone alwaysinline
-  ret i32 %res
-}
+declare  i32 @__popcnt_int32(i32) nounwind readonly
+;; define  i32 @__popcnt_int32(i32) nounwind readonly alwaysinline {
+;; ;;  %call = call i32 @llvm.ctpop.i32(i32 %0)
+;; ;;  ret i32 %call
+;;   %res = tail call i32 asm sideeffect "popc.b32 $0, $1;", "=r,r"(i32 %0) nounwind readnone alwaysinline
+;;   ret i32 %res
+;; }
 
 declare i64 @llvm.ctpop.i64(i64) nounwind readnone
 define  i64 @__popcnt_int64(i64) nounwind readonly alwaysinline {
