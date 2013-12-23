@@ -3523,6 +3523,8 @@ llvm::Value *
 FunctionEmitContext::LaunchInst(llvm::Value *callee,
                                 std::vector<llvm::Value *> &argVals,
                                 llvm::Value *launchCount[3]){
+  if (g->target->getISA() != Target::CUDA)
+  {
     if (callee == NULL) {
         AssertPos(currentPos, m->errorCount > 0);
         return NULL;
@@ -3587,6 +3589,62 @@ FunctionEmitContext::LaunchInst(llvm::Value *callee,
     args.push_back(launchCount[1]);
     args.push_back(launchCount[2]);
     return CallInst(flaunch, NULL, args, "");
+  }
+  else  /*  Target::CUDA */
+  {
+    /* create ISPCLaunchV2 function arguments & return types */
+
+    fprintf(stderr, " -------- 1 --------- \n");
+
+    std::vector<llvm::Type*> ISPCLaunchV2_args;
+    ISPCLaunchV2_args.push_back(LLVMTypes::VoidPointerType);
+    ISPCLaunchV2_args.push_back(LLVMTypes::Int32Type);
+    ISPCLaunchV2_args.push_back(LLVMTypes::Int32Type);
+    ISPCLaunchV2_args.push_back(LLVMTypes::Int32Type);
+#if 1
+    for (unsigned int i = 0; i < argVals.size(); i++)
+      ISPCLaunchV2_args.push_back(argVals[i]->getType());
+#endif
+    
+    fprintf(stderr, " -------- 2 --------- \n");
+
+    llvm::FunctionType* ISPCLaunchV2_type = llvm::FunctionType::get(
+        /*Result=*/LLVMTypes::VoidType, 
+        /*Params=*/ISPCLaunchV2_args,
+        /*isVarArg=*/false);
+
+    /* create ISPCLaunchV2 function */
+    fprintf(stderr, " -------- 3 --------- \n");
+
+    llvm::Function *ISPCLaunchV2_func = m->module->getFunction("ISPCLaunchV2");
+//    if (ISPCLaunchV2_func != NULL)
+    {
+      ISPCLaunchV2_func = llvm::Function::Create(
+          /*Type=*/ISPCLaunchV2_type,
+          /*Linkage=*/llvm::GlobalValue::ExternalLinkage,
+          /*Name=*/"ISPCLaunchV2", m->module);
+      ISPCLaunchV2_func->setCallingConv(llvm::CallingConv::C);
+    }
+    fprintf(stderr, " -------- 4 --------- \n");
+
+
+    /* void ISPCLaunch(void func(...), taskCount0, taskCount1, taskCount2, params) */
+    std::vector<llvm::Value *> args;
+    llvm::Value *fptr = BitCastInst(callee, LLVMTypes::VoidPointerType);
+    args.push_back(fptr);
+    args.push_back(launchCount[0]);
+    args.push_back(launchCount[1]);
+    args.push_back(launchCount[2]);
+#if 1
+    for (unsigned int i = 0; i < argVals.size(); ++i) 
+      args.push_back(argVals[i]);
+#endif
+    fprintf(stderr, " -------- 5 --------- \n");
+    llvm::Value *ret = CallInst(ISPCLaunchV2_func, NULL, args, "");
+    fprintf(stderr, " -------- 6 --------- \n");
+    return ret;
+  }
+
 }
 
 
