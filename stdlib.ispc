@@ -58,7 +58,7 @@
 #endif
 
 ///////////////////////////////////////////////////////////////////////////
-// Low level primitives
+// CUDA primitives
 __declspec(safe,cost0) static inline uniform int blockIndex () { return __blockIndex (); }
 __declspec(safe,cost0) static inline uniform int blockIndex0() { return __blockIndex0(); }
 __declspec(safe,cost0) static inline uniform int blockIndex1() { return __blockIndex1(); }
@@ -67,6 +67,15 @@ __declspec(safe,cost0) static inline uniform int blockCount () { return __blockC
 __declspec(safe,cost0) static inline uniform int blockCount0() { return __blockCount0(); }
 __declspec(safe,cost0) static inline uniform int blockCount1() { return __blockCount1(); }
 __declspec(safe,cost0) static inline uniform int blockCount2() { return __blockCount2(); }
+
+#if 0
+__declspec(safe,cost0) 
+  static inline uniform int8 * uniform ISPCAlloc (uniform int8 * uniform * uniform  handle, uniform int64 align, uniform int64 size) 
+{ return __ISPCAlloc(handle, align, size); }
+__declspec(safe,cost0) 
+  static inline void ISPCLaunch (uniform int8 * uniform * uniform handle, uniform int8 * uniform func_ptr, uniform int8* uniform func_args, uniform int32 ntx, uniform int32 nty, uniform int32 ntz)
+{ __ISPCLaunch(handle, func_ptr, func_args, ntx, nty, ntz); }
+#endif
 
 ///////////////////////////////////////////////////////////////////////////
 // Low level primitives

@@ -1830,8 +1830,8 @@ define(`stdlib_core', `
 
 declare i32 @__fast_masked_vload()
 
-declare i8* @ISPCAlloc(i8**, i64, i32) nounwind
-declare void @ISPCLaunchV2a(i8*, i32, i32, i32, ...) 
+declare i8*  @ISPCAlloc(i8**, i64, i64) nounwind
+declare void @ISPCLaunch(i8**, i8*, i8*, i32, i32, i32) nounwind
 declare void @ISPCSync(i8*) nounwind
 declare void @ISPCInstrument(i8*, i8*, i32, i64) nounwind
 
