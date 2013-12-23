@@ -2262,6 +2262,7 @@ static void lAddMaskToSymbolTable(SourcePos pos) {
 /** Add the thread index and thread count variables to the symbol table
     (this should only be done for 'task'-qualified functions. */
 static void lAddThreadIndexCountToSymbolTable(SourcePos pos) {
+   if (g->target->getISA() == Target::CUDA) return;
     const Type *type = AtomicType::UniformUInt32->GetAsConstType();
 
     Symbol *threadIndexSym = new Symbol("threadIndex", pos, type);

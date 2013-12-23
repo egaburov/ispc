@@ -795,7 +795,7 @@ Module::AddFunctionDeclaration(const std::string &name,
 #else // LLVM 3.1 and 3.3+
         function->addFnAttr(llvm::Attribute::AlwaysInline);
 #endif
-    if (functionType->isTask)
+    if (functionType->isTask && g->target->getISA() != Target::CUDA)
         // This also applies transitively to members I think?
 #if defined(LLVM_3_1)
         function->setDoesNotAlias(1, true);
@@ -1911,6 +1911,24 @@ Module::execPreprocessor(const char *infilename, llvm::raw_string_ostream *ostre
         if (g->cppArgs[i].substr(0,2) == "-D") {
             opts.addMacroDef(g->cppArgs[i].substr(2));
         }
+    }
+    if (g->target->getISA() == Target::CUDA)
+    {
+      opts.addMacroDef("__NVPTX__");
+      opts.addMacroDef("cif=if");
+      opts.addMacroDef("cfor=for");
+      opts.addMacroDef("cwhile=while");
+      opts.addMacroDef("cdo=do");
+      opts.addMacroDef("taskIndex=blockIndex()");
+      opts.addMacroDef("taskCount=blockCount()");
+      opts.addMacroDef("threadIndex==blockIndex()");
+      opts.addMacroDef("threadCount==blockCount()");
+      opts.addMacroDef("taskIndex0=blockIndex0()");
+      opts.addMacroDef("taskCount0=blockCount0()");
+      opts.addMacroDef("taskIndex1=blockIndex1()");
+      opts.addMacroDef("taskCount1=blockCount1()");
+      opts.addMacroDef("taskIndex2=blockIndex2()");
+      opts.addMacroDef("taskCount2=blockCount2()");
     }
 
 #if defined(LLVM_3_1)

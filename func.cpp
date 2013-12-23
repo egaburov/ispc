@@ -123,7 +123,7 @@ Function::Function(Symbol *s, Stmt *c) {
             sym->parentFunction = this;
     }
 
-    if (type->isTask) {
+    if (type->isTask && g->target->getISA() != Target::CUDA) {
         threadIndexSym = m->symbolTable->LookupVariable("threadIndex");
         Assert(threadIndexSym);
         threadCountSym = m->symbolTable->LookupVariable("threadCount");
@@ -234,7 +234,7 @@ Function::emitCode(FunctionEmitContext *ctx, llvm::Function *function,
 #endif
     const FunctionType *type = CastType<FunctionType>(sym->type);
     Assert(type != NULL);
-    if (type->isTask == true) {
+    if (type->isTask == true && g->target->getISA() != Target::CUDA)  {
         // For tasks, we there should always be three parmeters: the
         // pointer to the structure that holds all of the arguments, the
         // thread index, and the thread count variables.
@@ -332,6 +332,16 @@ Function::emitCode(FunctionEmitContext *ctx, llvm::Function *function,
             ctx->SetFunctionMask(argIter);
             Assert(++argIter == function->arg_end());
         }
+        if (g->target->getISA() == Target::CUDA)
+        {
+          llvm::NamedMDNode* annotations =
+            m->module->getOrInsertNamedMetadata("nvvm.annotations");
+          llvm::SmallVector<llvm::Value*, 3> av;
+          av.push_back(function);
+          av.push_back(llvm::MDString::get(*g->ctx, "kernel"));
+          av.push_back(LLVMInt32(1));
+          annotations->addOperand(llvm::MDNode::get(*g->ctx, av));
+        }
     }
 
     // Finally, we can generate code for the function
@@ -347,7 +357,7 @@ Function::emitCode(FunctionEmitContext *ctx, llvm::Function *function,
         // entire thing inside code that tests to see if the mask is all
         // on, all off, or mixed.  If this is a simple function, then this
         // isn't worth the code bloat / overhead.
-        bool checkMask = (type->isTask == true) ||
+        bool checkMask = (type->isTask == true && g->target->getISA() != Target::CUDA) ||
             (
 #if defined(LLVM_3_1)
               (function->hasFnAttr(llvm::Attribute::AlwaysInline) == false)

@@ -59,6 +59,17 @@
 
 ///////////////////////////////////////////////////////////////////////////
 // Low level primitives
+__declspec(safe,cost0) static inline uniform int blockIndex () { return __blockIndex (); }
+__declspec(safe,cost0) static inline uniform int blockIndex0() { return __blockIndex0(); }
+__declspec(safe,cost0) static inline uniform int blockIndex1() { return __blockIndex1(); }
+__declspec(safe,cost0) static inline uniform int blockIndex2() { return __blockIndex2(); }
+__declspec(safe,cost0) static inline uniform int blockCount () { return __blockCount (); }
+__declspec(safe,cost0) static inline uniform int blockCount0() { return __blockCount0(); }
+__declspec(safe,cost0) static inline uniform int blockCount1() { return __blockCount1(); }
+__declspec(safe,cost0) static inline uniform int blockCount2() { return __blockCount2(); }
+
+///////////////////////////////////////////////////////////////////////////
+// Low level primitives
 
 __declspec(safe,cost0)
 static inline float floatbits(unsigned int a) {
