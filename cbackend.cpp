@@ -3032,14 +3032,14 @@ void CWriter::printFunction(llvm::Function &F) {
     {
       const llvm::Function *fdev = annotations.getDeviceFunction();
       const std::string fdevNameStr = fdev->getName().str();
-      Out << "    " << fdevNameStr << "<<<1,32>>>( ";
+      Out << "  " << fdevNameStr << "<<<1,32>>>( ";
       llvm::Function::const_arg_iterator I = F.arg_begin(), E = F.arg_end();
       for (; I != E; ++I) 
         Out << GetValueName(I) << ", ";
       if (F.arg_size() != fdev->arg_size())   /* device function is masked */
         Out << "true ";
       Out << ");\n";
-      Out << " }\n";
+      Out << "}\n";
       return;
     }
 
