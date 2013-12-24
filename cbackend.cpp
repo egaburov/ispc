@@ -954,14 +954,16 @@ llvm::raw_ostream &CWriter::printType(llvm::raw_ostream &Out, llvm::Type *Ty,
 
     // if it's an array of i8s, also provide a version that takes a const
     // char *
-    if (ATy->getElementType() == LLVMTypes::Int8Type) {
+    if (g->target->getISA() != Target::CUDA)
+      if (ATy->getElementType() == LLVMTypes::Int8Type) {
         Out << "  static " << NameSoFar << " init(const char *p) {\n";
         Out << "    " << NameSoFar << " ret;\n";
         Out << "    memcpy((uint8_t *)ret.array, (uint8_t *)p, " << NumElements << ");\n";
         Out << "    return ret;\n";
         Out << "  }\n";
-    }
+      }
 
+    /* evghenii :: for uniform data-types in CUDA use SharedArray */
     std::string type;
     if (ATy->getElementType() == LLVMTypes::BoolType ||
         ATy->getElementType() == LLVMTypes::Int8Type ||
