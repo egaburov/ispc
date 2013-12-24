@@ -31,21 +31,10 @@
    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  
 */
 
-#include <stdint.h>
-#include <math.h>
+#define FORCEINLINE __device__ __forceinline__
 
-#ifdef _MSC_VER
-#define FORCEINLINE __forceinline
-#define PRE_ALIGN(x)  /*__declspec(align(x))*/
-#define POST_ALIGN(x)  
-#define roundf(x) (floorf(x + .5f))
-#define round(x) (floor(x + .5))
-#else
-#define FORCEINLINE __attribute__((always_inline))
-#define PRE_ALIGN(x)
-#define POST_ALIGN(x)  __attribute__ ((aligned(x)))
-#endif
-
+typedef bool bool_t;
+typedef bool_t __vec1_i1;
 typedef float __vec1_f;
 typedef double __vec1_d;
 typedef int8_t __vec1_i8;
@@ -53,9 +42,113 @@ typedef int16_t __vec1_i16;
 typedef int32_t __vec1_i32;
 typedef int64_t __vec1_i64;
 
+#define WARPSZ2 5
+#define WARPSZ (1<<WARPSZ2)
+
+static FORCEINLINE int32_t programIndex()
+{
+  int laneIdx;
+  asm("mov.u32 %0, %laneid;" : "=r" (laneIdx));
+  return laneIdx;
+}
+static FORCEINLINE int32_t __blockIndex0()
+{
+  return (blockIdx.x << 2) + (threadIdx.x >> WARPSZ2);
+}
+static FORCEINLINE int32_t __blockIndex1()
+{
+  return blockIdx.y;
+}
+static FORCEINLINE int32_t __blockIndex2()
+{
+  return blockIdx.z;
+}
+static FORCEINLINE int32_t __blockCount0()
+{
+  return gridDim.x << 2;
+}
+static FORCEINLINE int32_t __blockCount1()
+{
+  return gridDim.y;
+}
+static FORCEINLINE int32_t __blockCount2()
+{
+  return gridDim.z;
+}
+static FORCEINLINE int32_t __blockIndex()
+{
+  return __blockIndex0() + __blockCount0()*(__blockIndex1() + __blockCount1()*__blockIndex2());
+}
+static FORCEINLINE int32_t __blockCount()
+{
+  return __blockCount0()*__blockCount1()*__blockCount2();
+}
+
+
+/****** shuffle instruction ******/
+
+/* bool, int8_t, int16_t, int32_t */
+template<typename T>
+static FORCEINLINE T __shuffle(const T v, const int32_t index)
+{
+  return static_cast<T>(__shfl(static_cast<int32_t>(v), index));
+}
+/* float */
+template<>
+static FORCEINLINE float __shuffle(const float v, const int32_t index)
+{
+  return __shfl(v, index);
+}
+/* double */
+template<>
+static FORCEINLINE double __shuffle(const double v, const int32_t index)
+{
+  return __hiloint2double(
+      __shfl(__double2hiint(v), index),
+      __shfl(__double2loint(v), index));
+}
+
+/* int64_t */
+  template<>
+static FORCEINLINE int64_t __shuffle(const int64_t _v, const int32_t index)
+{
+  const double v = __longlong_as_double(_v);
+  return __double_as_longlong(__hiloint2double(
+      __shfl(__double2hiint(v), index),
+      __shfl(__double2loint(v), index)));
+}
+
+
+/***** reductions *****/
 
 template<typename T>
-__device__ static FORCEINLINE T __set(
+struct OpAdd
+{
+  static FORCEINLINE T exec(const T a, const T b) { return a + b; }
+};
+template<typename T>
+struct OpMin
+{
+  static FORCEINLINE T exec(const T a, const T b) { return min(a,b); }
+};
+template<typename T>
+struct OpMax
+{
+  static FORCEINLINE T exec(const T a, const T b) { return max(a,b); }
+};
+
+  template<typename T, typename OP>
+static FORCEINLINE T __reduce(T v)
+{
+#pragma unroll 
+  for (int i = WARPSZ-1; i >= 0; i++)
+    v = OP::exec(v, __shuffle(v, 1<<i));
+  return __shuffle(v, 0);
+}
+ 
+#if 0
+template<typename T>
+static FORCEINLINE T __set(const int index,
       const T v0,  const T v1,  const T v2,  const T v3,
       const T v4,  const T v5,  const T v6,  const T v7,
       const T v8,  const T v9,  const T v10, const T v11,
@@ -65,12 +158,14 @@ __device__ static FORCEINLINE T __set(
       const T v24, const T v25, const T v26, const T v27,
       const T v28, const T v29, const T v30, const T v31);
 template<typename T>
-__device__ static FORCEINLINE T __set(const int32_t index, const T value);
+static FORCEINLINE T __set(const int32_t index, const T value);
 template<typename T>
-__device__ static FORCEINLINE T __get(const int32_t index, const T value);
+static FORCEINLINE T __get(const int32_t index, const T value);
+#endif
 
+#if 0
 template<>
-__device__ static FORCEINLINE bool __get<bool>(
+static FORCEINLINE bool __set<bool>(const int index,
       const bool v0,  const bool v1,  const bool v2,  const bool v3,
       const bool v4,  const bool v5,  const bool v6,  const bool v7,
       const bool v8,  const bool v9,  const bool v10, const bool v11,
@@ -112,14 +207,16 @@ __device__ static FORCEINLINE bool __get<bool>(
       ((v29 & 1) << 29) |
       ((v30 & 1) << 30) |
       ((v31 & 1) << 31));
-  return v & programIndex();
+  return v & (1<<index);
 }
+#endif
 
 template <typename T>
 struct vec32 
 {
   FORCEINLINE vec32() { }
-  FORCEINLINE vec32(T v) : v(_v) {}
+  FORCEINLINE vec32(T _v) : v(_v) {}
+#if 0
   FORCEINLINE vec32(T v0,  T v1,  T v2,  T v3,  T v4,  T v5,  T v6,  T v7,
       T v8,  T v9,  T v10, T v11, T v12, T v13, T v14, T v15,
       T v16, T v17, T v18, T v19, T v20, T v21, T v22, T v23,
@@ -129,142 +226,54 @@ struct vec32
           v8,  v9,  v10, v11, v12, v13, v14, v15,
           v16, v17, v18, v19, v20, v21, v22, v23,
           v24, v25, v26, v27, v28, v29, v30, v31)) { } 
-  T _v;
-  FORCEINLINE T get(const int i)        const { return __get<T>(i,v); }
-  FORCEINLINE T set(const int i, const T vv)  { v = __set<T>(i,vv); return v; }
+#endif
+  T v;
+  FORCEINLINE T get(const int index)        const { return __shuffle<T>(v, index); }
+#if 0
+  FORCEINLINE void set(const int i, const T vv)  { v = vv; } // = __set<T>(i,vv); 
+#endif
 };
 
-struct __vec32_i1 : public vec32<bool>
+struct __vec32_i1 : public vec32<bool_t>
 {
   FORCEINLINE __vec32_i1() { }
-  FORCEINLINE __vec32_i1(
-      const bool v0,  const bool v1,  const bool v2,  const bool v3, 
-      const bool v4,  const bool v5,  const bool v6,  const bool v7,
-      const bool v8,  const bool v9,  const bool v10, const bool v11, 
-      const bool v12, const bool v13, const bool v14, const bool v15,
-      const bool v16, const bool v17, const bool v18, const bool v19,
-      const bool v20, const bool v21, const bool v22, const bool v23,
-      const bool v24, const bool v25, const bool v26, const bool v27,
-      const bool v28, const bool v29, const bool v30, const bool v31)
-    : vec32<bool>(
-        v0,  v1,  v2,  v3,  v4,  v5,  v6,  v7,
-        v8,  v9,  v10, v11, v12, v13, v14, v15,
-        v16, v17, v18, v19, v20, v21, v22, v23,
-        v24, v25, v26, v27, v28, v29, v30, v31) { }
+  FORCEINLINE __vec32_i1(bool_t v) : vec32<bool_t>(v) {}
 };
 
 struct __vec32_f : public vec32<float> 
 {
   FORCEINLINE __vec32_f() { }
-  FORCEINLINE __vec32_f(
-      const float v0,  const float v1,  const float v2,  const float v3, 
-      const float v4,  const float v5,  const float v6,  const float v7,
-      const float v8,  const float v9,  const float v10, const float v11, 
-      const float v12, const float v13, const float v14, const float v15,
-      const float v16, const float v17, const float v18, const float v19,
-      const float v20, const float v21, const float v22, const float v23,
-      const float v24, const float v25, const float v26, const float v27,
-      const float v28, const float v29, const float v30, const float v31)
-    : vec32<float>(
-        v0,  v1,  v2,  v3,  v4,  v5,  v6,  v7,
-        v8,  v9,  v10, v11, v12, v13, v14, v15,
-        v16, v17, v18, v19, v20, v21, v22, v23,
-        v24, v25, v26, v27, v28, v29, v30, v31) { }
+  FORCEINLINE __vec32_f(float v) : vec32<float>(v) {}
 };
 
 struct __vec32_d : public vec32<double> 
 {
   FORCEINLINE __vec32_d() { }
-  FORCEINLINE __vec32_d(
-      const double v0,  const double v1,  const double v2,  const double v3, 
-      const double v4,  const double v5,  const double v6,  const double v7,
-      const double v8,  const double v9,  const double v10, const double v11, 
-      const double v12, const double v13, const double v14, const double v15,
-      const double v16, const double v17, const double v18, const double v19,
-      const double v20, const double v21, const double v22, const double v23,
-      const double v24, const double v25, const double v26, const double v27,
-      const double v28, const double v29, const double v30, const double v31)
-    : vec32<double>(
-        v0,  v1,  v2,  v3,  v4,  v5,  v6,  v7,
-        v8,  v9,  v10, v11, v12, v13, v14, v15,
-        v16, v17, v18, v19, v20, v21, v22, v23,
-        v24, v25, v26, v27, v28, v29, v30, v31) { }
+  FORCEINLINE __vec32_d(double v) : vec32<double>(v) {}
 };
 
 struct __vec32_i8 : public vec32<int8_t> 
 {
   FORCEINLINE __vec32_i8() { }
-  FORCEINLINE __vec32_i8(
-      const int8_t v0,  const int8_t v1,  const int8_t v2,  const int8_t v3, 
-      const int8_t v4,  const int8_t v5,  const int8_t v6,  const int8_t v7,
-      const int8_t v8,  const int8_t v9,  const int8_t v10, const int8_t v11, 
-      const int8_t v12, const int8_t v13, const int8_t v14, const int8_t v15,
-      const int8_t v16, const int8_t v17, const int8_t v18, const int8_t v19,
-      const int8_t v20, const int8_t v21, const int8_t v22, const int8_t v23,
-      const int8_t v24, const int8_t v25, const int8_t v26, const int8_t v27,
-      const int8_t v28, const int8_t v29, const int8_t v30, const int8_t v31)
-    : vec32<int8_t>(
-        v0,  v1,  v2,  v3,  v4,  v5,  v6,  v7,
-        v8,  v9,  v10, v11, v12, v13, v14, v15,
-        v16, v17, v18, v19, v20, v21, v22, v23,
-        v24, v25, v26, v27, v28, v29, v30, v31) { }
+  FORCEINLINE __vec32_i8(int8_t v) : vec32<int8_t>(v) {}
 };
 
 struct __vec32_i16 : public vec32<int16_t>
 {
   FORCEINLINE __vec32_i16() { }
-  FORCEINLINE __vec32_i16(
-      const int16_t v0,  const int16_t v1,  const int16_t v2,  const int16_t v3, 
-      const int16_t v4,  const int16_t v5,  const int16_t v6,  const int16_t v7,
-      const int16_t v8,  const int16_t v9,  const int16_t v10, const int16_t v11, 
-      const int16_t v12, const int16_t v13, const int16_t v14, const int16_t v15,
-      const int16_t v16, const int16_t v17, const int16_t v18, const int16_t v19,
-      const int16_t v20, const int16_t v21, const int16_t v22, const int16_t v23,
-      const int16_t v24, const int16_t v25, const int16_t v26, const int16_t v27,
-      const int16_t v28, const int16_t v29, const int16_t v30, const int16_t v31)
-    : vec32<int16_t>(
-        v0,  v1,  v2,  v3,  v4,  v5,  v6,  v7,
-        v8,  v9,  v10, v11, v12, v13, v14, v15,
-        v16, v17, v18, v19, v20, v21, v22, v23,
-        v24, v25, v26, v27, v28, v29, v30, v31) { }
+  FORCEINLINE __vec32_i16(int16_t v) : vec32<int16_t>(v) {}
 };
 
 struct __vec32_i32 : public vec32<int32_t>
 {
   FORCEINLINE __vec32_i32() { }
-  FORCEINLINE __vec32_i32(
-      const int32_t v0,  const int32_t v1,  const int32_t v2,  const int32_t v3, 
-      const int32_t v4,  const int32_t v5,  const int32_t v6,  const int32_t v7,
-      const int32_t v8,  const int32_t v9,  const int32_t v10, const int32_t v11, 
-      const int32_t v12, const int32_t v13, const int32_t v14, const int32_t v15,
-      const int32_t v16, const int32_t v17, const int32_t v18, const int32_t v19,
-      const int32_t v20, const int32_t v21, const int32_t v22, const int32_t v23,
-      const int32_t v24, const int32_t v25, const int32_t v26, const int32_t v27,
-      const int32_t v28, const int32_t v29, const int32_t v30, const int32_t v31)
-    : vec32<int32_t>(
-        v0,  v1,  v2,  v3,  v4,  v5,  v6,  v7,
-        v8,  v9,  v10, v11, v12, v13, v14, v15,
-        v16, v17, v18, v19, v20, v21, v22, v23,
-        v24, v25, v26, v27, v28, v29, v30, v31) { }
+  FORCEINLINE __vec32_i32(int32_t v) : vec32<int32_t>(v) {}
 };
 
 struct __vec32_i64 : public vec32<int64_t>
 {
   FORCEINLINE __vec32_i64() { }
-  FORCEINLINE __vec32_i64(
-      const int64_t v0,  const int64_t v1,  const int64_t v2,  const int64_t v3, 
-      const int64_t v4,  const int64_t v5,  const int64_t v6,  const int64_t v7,
-      const int64_t v8,  const int64_t v9,  const int64_t v10, const int64_t v11, 
-      const int64_t v12, const int64_t v13, const int64_t v14, const int64_t v15,
-      const int64_t v16, const int64_t v17, const int64_t v18, const int64_t v19,
-      const int64_t v20, const int64_t v21, const int64_t v22, const int64_t v23,
-      const int64_t v24, const int64_t v25, const int64_t v26, const int64_t v27,
-      const int64_t v28, const int64_t v29, const int64_t v30, const int64_t v31)
-    : vec32<int64_t>(
-        v0,  v1,  v2,  v3,  v4,  v5,  v6,  v7,
-        v8,  v9,  v10, v11, v12, v13, v14, v15,
-        v16, v17, v18, v19, v20, v21, v22, v23,
-        v24, v25, v26, v27, v28, v29, v30, v31) { }
+  FORCEINLINE __vec32_i64(int64_t v) : vec32<int64_t>(v) {}
 };
 
 // static inline int32_t __extract_element(__vec32_i32, int);
@@ -314,13 +323,20 @@ static FORCEINLINE __vec32_i1 NAME##_##SUFFIX##_and_mask(TYPE a, TYPE b,       \
    return ret;                                                      \
 }
 
+#if 0
 #define INSERT_EXTRACT(VTYPE, STYPE)                                  \
 static FORCEINLINE STYPE __extract_element(VTYPE v, int index) {      \
-    return __shuffle<STYPE>(v,index)  ;                                      \
+    return __shuffle<STYPE>(v.v,index)  ;                              \
 }                                                                     \
 static FORCEINLINE void __insert_element(VTYPE &v, int index, STYPE val) { \
     v.set(index, val);                                                \
 }
+#else
+#define INSERT_EXTRACT(VTYPE, STYPE)                                  \
+static FORCEINLINE STYPE __extract_element(VTYPE v, int index) {      \
+    return __shuffle<STYPE>(v.v,index)  ;                              \
+}                                                                     
+#endif
 
 #define LOAD_STORE(VTYPE, STYPE)                       \
 template <int ALIGN>                                   \
@@ -338,18 +354,18 @@ static FORCEINLINE void __store(VTYPE *p, VTYPE v) {   \
 
 #define REDUCE_ADD(TYPE, VTYPE, NAME)           \
 static FORCEINLINE TYPE NAME(VTYPE v) {         \
-     TYPE ret = __reduce_add<TYPE>(v.v);        \
+     TYPE ret = __reduce<TYPE,OpAdd<TYPE> >(v.v);        \
      return ret;                                \
 }
 
 #define REDUCE_MIN(TYPE, VTYPE, NAME, OP)                       \
 static FORCEINLINE TYPE NAME(VTYPE v) {                         \
-    TYPE ret = __reduce_min<TYPE>(v.v);                         \
+    TYPE ret = __reduce<TYPE,OpMin<TYPE> >(v.v);                         \
     return ret;                                                 \
 }
 #define REDUCE_MAX(TYPE, VTYPE, NAME, OP)                       \
 static FORCEINLINE TYPE NAME(VTYPE v) {                         \
-    TYPE ret = __reduce_max<TYPE>(v.v);                         \
+    TYPE ret = __reduce<TYPE,OpMax<TYPE> >(v.v);                         \
     return ret;                                                 \
 }
 
@@ -418,7 +434,7 @@ static FORCEINLINE VTYPE __shift_##NAME(VTYPE v, int index) {   \
 #define SHUFFLES(VTYPE, NAME, STYPE)                  \
 static FORCEINLINE VTYPE __shuffle_##NAME(VTYPE v, __vec32_i32 index) {   \
     VTYPE ret;                                        \
-    ret.v = __shuffle<STPYE>(v.v, index.v & 0x1F);    \
+    ret.v = __shuffle<STYPE>(v.v, index.v & 0x1F);    \
     return ret;                                       \
 }                                                     \
 static FORCEINLINE VTYPE __shuffle2_##NAME(VTYPE v0, VTYPE v1, __vec32_i32 index) {     \
@@ -432,23 +448,30 @@ static FORCEINLINE VTYPE __shuffle2_##NAME(VTYPE v0, VTYPE v1, __vec32_i32 index
 
 ///////////////////////////////////////////////////////////////////////////
 
-INSERT_EXTRACT(__vec1_i1, bool)
-INSERT_EXTRACT(__vec1_i8, int8_t)
-INSERT_EXTRACT(__vec1_i16, int16_t)
-INSERT_EXTRACT(__vec1_i32, int32_t)
-INSERT_EXTRACT(__vec1_i64, int64_t)
-INSERT_EXTRACT(__vec1_f, float)
-INSERT_EXTRACT(__vec1_d, double)
+#define INSERT_EXTRACT1(VTYPE, STYPE)                                  \
+static FORCEINLINE STYPE __extract_element(VTYPE v, int index) {      \
+    return __shuffle<STYPE>(v,index)  ;                                      \
+}                                                                     \
+static FORCEINLINE void __insert_element(VTYPE &v, int index, STYPE val) { \
+    v = val;                                                \
+}
+INSERT_EXTRACT1(__vec1_i1, bool)
+INSERT_EXTRACT1(__vec1_i8, int8_t)
+INSERT_EXTRACT1(__vec1_i16, int16_t)
+INSERT_EXTRACT1(__vec1_i32, int32_t)
+INSERT_EXTRACT1(__vec1_i64, int64_t)
+INSERT_EXTRACT1(__vec1_f, float)
+INSERT_EXTRACT1(__vec1_d, double)
 
 ///////////////////////////////////////////////////////////////////////////
 // mask ops
 
-static FORCEINLINE uint64_t __movmsk(__vec32_i1 mask) {   __ballot(mask.v); }
-static FORCEINLINE bool __any(__vec32_i1 mask) {  __any(mask.v); }
-static FORCEINLINE bool __all(__vec32_i1 mask) {  __all(mask.v); }
-static FORCEINLINE bool __none(__vec32_i1 mask) {   __none(mask.v); }
-static FORCEINLINE __vec32_i1 __equal_i1(__vec32_i1 a, __vec32_i1 b) {  return a.v == b.v; }
-static FORCEINLINE __vec32_i1 __and(__vec32_i1 a, __vec32_i1 b) {  return a.v & b.v; }
+static FORCEINLINE uint64_t __movmsk(__vec32_i1 mask) { return  __ballot(mask.v); }
+static FORCEINLINE bool __any(__vec32_i1 mask) {return  __any(mask.v); }
+static FORCEINLINE bool __all(__vec32_i1 mask) { return __all(mask.v); }
+static FORCEINLINE bool __none(__vec32_i1 mask) { return  !__any(mask.v); }
+static FORCEINLINE __vec32_i1 __equal_i1(__vec32_i1 a, __vec32_i1 b) {  return static_cast<bool_t>(a.v == b.v); }
+static FORCEINLINE __vec32_i1 __and(__vec32_i1 a, __vec32_i1 b) {  return static_cast<bool_t>(a.v & b.v); }
 static FORCEINLINE __vec32_i1 __xor(__vec32_i1 a, __vec32_i1 b) {   return a.v ^ b.v; }
 static FORCEINLINE __vec32_i1 __or(__vec32_i1 a, __vec32_i1 b) {   return a.v | b.v; }
 static FORCEINLINE __vec32_i1 __not(__vec32_i1 v) { return ~v.v; }
@@ -762,7 +785,7 @@ static FORCEINLINE __vec32_i16 __float_to_half_varying(__vec32_f v) {
   __vec32_i16 ret;
   ret.v = __float_to_half_uniform(v.v);
   return ret;
-}v
+}
 
 
 ///////////////////////////////////////////////////////////////////////////
@@ -827,7 +850,6 @@ static FORCEINLINE TYPE __cast_sext(TYPE, __vec32_i1 v) {  \
     ret.v = 0;                                        \
     if (v.v)                                          \
        ret.v = ~ret.v;                                \
-    }                                                 \
     return ret;                                       \
 }
 
@@ -1063,11 +1085,11 @@ static FORCEINLINE int32_t __popcnt_int64(uint64_t v) {
 
 static FORCEINLINE int32_t __count_trailing_zeros_i32(uint32_t v) {
   // ctz(x) =  popc((x&(-x))-1) from Wikipedia
-  return __popc((x&(-x))-1);
+  return __popc((v&(-v))-1);
 }
 static FORCEINLINE int64_t __count_trailing_zeros_i64(uint64_t v) {
   // ctz(x) =  popc((x&(-x))-1) from Wikipedia
-  return __popcll((x&(-x))-1);
+  return __popcll((v&(-v))-1);
 }
 
 static FORCEINLINE int32_t __count_leading_zeros_i32(uint32_t v) {
@@ -1081,29 +1103,29 @@ static FORCEINLINE int64_t __count_leading_zeros_i64(uint64_t v) {
 // reductions
 
 REDUCE_ADD(float, __vec32_f, __reduce_add_float)
-REDUCE_MINMAX(float, __vec32_f, __reduce_min_float, <)
-REDUCE_MINMAX(float, __vec32_f, __reduce_max_float, >)
+REDUCE_MIN(float, __vec32_f, __reduce_min_float, <)
+REDUCE_MAX(float, __vec32_f, __reduce_max_float, >)
 
 REDUCE_ADD(double, __vec32_d, __reduce_add_double)
-REDUCE_MINMAX(double, __vec32_d, __reduce_min_double, <)
-REDUCE_MINMAX(double, __vec32_d, __reduce_max_double, >)
+REDUCE_MIN(double, __vec32_d, __reduce_min_double, <)
+REDUCE_MAX(double, __vec32_d, __reduce_max_double, >)
 
 REDUCE_ADD(int16_t, __vec32_i8, __reduce_add_int8)
 REDUCE_ADD(int32_t, __vec32_i16, __reduce_add_int16)
 
 REDUCE_ADD(int64_t, __vec32_i32, __reduce_add_int32)
-REDUCE_MINMAX(int32_t, __vec32_i32, __reduce_min_int32, <)
-REDUCE_MINMAX(int32_t, __vec32_i32, __reduce_max_int32, >)
+REDUCE_MIN(int32_t, __vec32_i32, __reduce_min_int32, <)
+REDUCE_MAX(int32_t, __vec32_i32, __reduce_max_int32, >)
 
-REDUCE_MINMAX(uint32_t, __vec32_i32, __reduce_min_uint32, <)
-REDUCE_MINMAX(uint32_t, __vec32_i32, __reduce_max_uint32, >)
+REDUCE_MIN(uint32_t, __vec32_i32, __reduce_min_uint32, <)
+REDUCE_MAX(uint32_t, __vec32_i32, __reduce_max_uint32, >)
 
 REDUCE_ADD(int64_t, __vec32_i64, __reduce_add_int64)
-REDUCE_MINMAX(int64_t, __vec32_i64, __reduce_min_int64, <)
-REDUCE_MINMAX(int64_t, __vec32_i64, __reduce_max_int64, >)
+REDUCE_MIN(int64_t, __vec32_i64, __reduce_min_int64, <)
+REDUCE_MAX(int64_t, __vec32_i64, __reduce_max_int64, >)
 
-REDUCE_MINMAX(uint64_t, __vec32_i64, __reduce_min_uint64, <)
-REDUCE_MINMAX(uint64_t, __vec32_i64, __reduce_max_uint64, >)
+REDUCE_MIN(uint64_t, __vec32_i64, __reduce_min_uint64, <)
+REDUCE_MAX(uint64_t, __vec32_i64, __reduce_max_uint64, >)
 
 ///////////////////////////////////////////////////////////////////////////
 // masked load/store
@@ -1165,7 +1187,7 @@ static FORCEINLINE __vec32_d __masked_load_double(void *p,
 static FORCEINLINE void __masked_store_i8(void *p, __vec32_i8 val,
                                           __vec32_i1 mask) {
     int8_t *ptr = (int8_t *)p;
-    if ((mask.v )) != 0)
+    if ((mask.v ) != 0)
       ptr[programIndex()] = val.v;
 }
 
@@ -1380,7 +1402,7 @@ static FORCEINLINE int32_t __packed_store_active2(int32_t *ptr, __vec32_i32 val,
   }
   return ptr - ptr_;
 #else
-  __packed_store_active(ptr, val, mask);
+  return __packed_store_active(ptr, val, mask);
 #endif
 }
 
@@ -1410,7 +1432,7 @@ static FORCEINLINE int32_t __packed_store_active2(uint32_t *ptr,
 // aos/soa
 
 static FORCEINLINE void __soa_to_aos3_float(__vec32_f v0, __vec32_f v1, __vec32_f v2, float *ptr) {
-  const count = 0;
+  int count = 0;
   for (int i = 0; i < 32; ++i) 
   {
     const bool cond = programIndex() == i;
@@ -1431,9 +1453,9 @@ static FORCEINLINE void __aos_to_soa3_float(float *ptr, __vec32_f *out0, __vec32
     const bool cond = programIndex() == i;
     if (cond)
     {
-      out0.v = *(ptr + 3*count + 0);
-      out1.v = *(ptr + 3*count + 1);
-      out2.v = *(ptr + 3*count + 2);
+      out0->v = *(ptr + 3*count + 0);
+      out1->v = *(ptr + 3*count + 1);
+      out2->v = *(ptr + 3*count + 2);
     }
     count += __ballot(cond) != 0;
   }
@@ -1441,7 +1463,7 @@ static FORCEINLINE void __aos_to_soa3_float(float *ptr, __vec32_f *out0, __vec32
 
 static FORCEINLINE void __soa_to_aos4_float(__vec32_f v0, __vec32_f v1, __vec32_f v2,
                                             __vec32_f v3, float *ptr) {
-  const count = 0;
+  int count = 0;
   for (int i = 0; i < 32; ++i) 
   {
     const bool cond = programIndex() == i;
@@ -1464,10 +1486,10 @@ static FORCEINLINE void __aos_to_soa4_float(float *ptr, __vec32_f *out0, __vec32
     const bool cond = programIndex() == i;
     if (cond)
     {
-      out0.v = *(ptr + 4*count + 0);
-      out1.v = *(ptr + 4*count + 1);
-      out2.v = *(ptr + 4*count + 2);
-      out3.v = *(ptr + 4*count + 3);
+      out0->v = *(ptr + 4*count + 0);
+      out1->v = *(ptr + 4*count + 1);
+      out2->v = *(ptr + 4*count + 2);
+      out3->v = *(ptr + 4*count + 3);
     }
     count += __ballot(cond) != 0;
   }
@@ -1511,12 +1533,12 @@ static FORCEINLINE uint32_t __atomic_xor(uint32_t *p, uint32_t v) {
   return atomicXor(p, v);
 }
 
-static FORCEINLINE uint32_t __atomic_min(uint32_t *p, uint32_t v) {
-  return atomicMin((int32_t)p, (int32_t)v);
+static FORCEINLINE int32_t __atomic_min(uint32_t *p, uint32_t v) {
+  return atomicMin((int32_t*)p, (int32_t)v);
 }
 
-static FORCEINLINE uint32_t __atomic_max(uint32_t *p, uint32_t v) {
-  return atomicMax((int32_t)p, (int32_t)v);
+static FORCEINLINE int32_t __atomic_max(uint32_t *p, uint32_t v) {
+  return atomicMax((int32_t*)p, (int32_t)v);
 }
 
 static FORCEINLINE uint32_t __atomic_umin(uint32_t *p, uint32_t v) {
