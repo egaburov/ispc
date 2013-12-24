@@ -110,6 +110,61 @@
 #define snprintf _snprintf
 #endif
 
+struct NVVMAnnotations
+{
+  private:
+    llvm::MDNode *node;
+    llvm::NamedMDNode* annotations;
+  public:
+    enum FuncType {DEVICE, GLOBAL, HOST};
+    NVVMAnnotations(const llvm::Module *module) : node(NULL)
+    {
+      annotations = module->getNamedMetadata("nvvm.annotations");
+    }
+    bool findFunction(const llvm::Function *F)
+    {
+      node = NULL;
+      if (annotations == NULL) return false;
+      const int n = annotations->getNumOperands();
+      for (int i = 0; i < n; i++)
+      {
+        node = annotations->getOperand(i);
+        assert(node != NULL);
+        const int nop = node->getNumOperands();
+        assert(nop == 3 || nop == 4);
+        const llvm::Function *func = llvm::dyn_cast<llvm::Function>(node->getOperand(0));
+        assert(func != NULL);
+        if (func == F)
+          return true;
+      }
+      node = NULL;
+      return false;
+    }
+    FuncType getFunctionType()
+    {
+      assert(annotations != NULL);
+      const llvm::MDString *string = llvm::dyn_cast<llvm::MDString>(node->getOperand(1));
+      assert(string != NULL);
+      const int nchar = string->getLength();
+      //      fprintf(stderr, " -- nchar= %d \n", nchar);
+      /* sizeof("host") == 4
+       * sizeof("kernel") == 6 
+       */
+      if      (nchar == 4) return HOST;
+      else if (nchar == 6) return GLOBAL;
+      else  assert(0);
+      return DEVICE;
+    }
+    const llvm::Function* getDeviceFunction()
+    {
+      const int nop = node->getNumOperands();
+      assert(nop == 4);
+      const llvm::Function *func = llvm::dyn_cast<llvm::Function>(node->getOperand(3));
+      assert(func != NULL);
+      return func;
+    }
+};
+
 // FIXME:
 namespace {
   /// TypeFinder - Walk over a module, identifying all of the types that are
@@ -918,11 +973,14 @@ llvm::raw_ostream &CWriter::printType(llvm::raw_ostream &Out, llvm::Type *Ty,
 }
 
 void CWriter::printConstantArray(llvm::ConstantArray *CPA, bool Static) {
+//  Out << " /* evghenii1 */ \n";
   printConstant(llvm::cast<llvm::Constant>(CPA->getOperand(0)), Static);
+ // Out << " /* evghenii2*/ \n";
   for (unsigned i = 1, e = CPA->getNumOperands(); i != e; ++i) {
     Out << ", ";
     printConstant(llvm::cast<llvm::Constant>(CPA->getOperand(i)), Static);
   }
+  //Out << " /* evghenii3*/ \n";
 }
 
 void CWriter::printConstantVector(llvm::ConstantVector *CP, bool Static) {
@@ -2259,16 +2317,20 @@ bool CWriter::doInitialization(llvm::Module &M) {
 
   Out << "#include \"" << includeName << "\"\n";
 
-  Out << "\n/* Basic Library Function Declarations */\n";
-  Out << "extern \"C\" {\n";
-  Out << "int puts(unsigned char *);\n";
-  Out << "unsigned int putchar(unsigned int);\n";
-  Out << "int fflush(void *);\n";
-  Out << "int printf(const unsigned char *, ...);\n";
-  Out << "uint8_t *memcpy(uint8_t *, uint8_t *, uint64_t );\n";
-  Out << "uint8_t *memset(uint8_t *, uint8_t, uint64_t );\n";
-  Out << "void memset_pattern16(void *, const void *, uint64_t );\n";
-  Out << "}\n\n";
+  /* evghenii :: don't print this for "cuda" target */
+  if (g->target->getISA() != Target::CUDA)
+  {
+    Out << "\n/* Basic Library Function Declarations */\n";
+    Out << "extern \"C\" {\n";
+    Out << "int puts(unsigned char *);\n";
+    Out << "unsigned int putchar(unsigned int);\n";
+    Out << "int fflush(void *);\n";
+    Out << "int printf(const unsigned char *, ...);\n";
+    Out << "uint8_t *memcpy(uint8_t *, uint8_t *, uint64_t );\n";
+    Out << "uint8_t *memset(uint8_t *, uint8_t, uint64_t );\n";
+    Out << "void memset_pattern16(void *, const void *, uint64_t );\n";
+    Out << "}\n\n";
+  }
 
   generateCompilerSpecificCode(Out, TD);
 
@@ -2640,6 +2702,7 @@ void CWriter::printVectorConstants(llvm::Function &F) {
         int alignment = 4 * std::min(vectorWidth, 16);
 
         Out << "static const ";
+        Out << "__device__ __constant__ "; /* evghenii */
         printSimpleType(Out, CDV->getElementType(), true, "");
         Out << "__attribute__ ((aligned(" << alignment << "))) ";
         Out << "VectorConstant" << VectorConstantIndex << "[] = { ";
@@ -2779,42 +2842,19 @@ void CWriter::printFunctionSignature(const llvm::Function *F, bool Prototype) {
   bool isStructReturn = F->hasStructRetAttr();
 
   /* evghenii :: adding CUDA qualifaries for __device__, __global__ & "host" function */
-  llvm::NamedMDNode* annotations =
-    m->module->getNamedMetadata("nvvm.annotations");
-  if (annotations != NULL)
+  NVVMAnnotations annotations(m->module);
+  if (annotations.findFunction(F))
   {
-    const int n = annotations->getNumOperands();
-    bool is_kernel = false;
-    bool is_host   = false;
-//    fprintf(stderr, " -- found %d annotations \n", n);
-    for (int i = 0; i < n; i++)
+    const NVVMAnnotations::FuncType ftype = annotations.getFunctionType();
+    switch(ftype)
     {
-      const llvm::MDNode *node = annotations->getOperand(i);
-      assert(node != NULL);
-      const int nop = node->getNumOperands();
- //     fprintf(stderr, " --  %d has %d operands \n", i, nop);
-      assert(nop == 3);
-      const llvm::Function *func = llvm::dyn_cast<llvm::Function>(node->getOperand(0));
-      assert(func != NULL);
-      const llvm::MDString *string = llvm::dyn_cast<llvm::MDString>(node->getOperand(1));
-      assert(string != NULL);
-      const int nchar = string->getLength();
-//      fprintf(stderr, " -- nchar= %d \n", nchar);
-      /* sizeof("host") == 4
-       * sizeof("kernel") == 6 
-       */
-      if (func == F)
-      {
-        if      (nchar == 4) is_host = true;
-        else if (nchar == 6) is_kernel = true;
-        else  assert(0);
-        break;
-      }
+      case NVVMAnnotations::GLOBAL:      Out << "__global__ "; break;
+      case NVVMAnnotations::HOST:        Out << "/* host */ "; break;
+      default: assert(0);
     }
-    if (is_kernel)    Out << "__global__ ";
-    else if (is_host) Out << "/* host */ ";
-    else              Out << "__device__ ";
   }
+  else
+    Out << "__device__ "; 
 
   if (F->hasLocalLinkage()) Out << "static ";
   if (F->hasDLLImportLinkage()) Out << "__declspec(dllimport) ";
@@ -2832,6 +2872,7 @@ void CWriter::printFunctionSignature(const llvm::Function *F, bool Prototype) {
    default:
     break;
   }
+
 
   // Loop over the arguments, printing them...
   llvm::FunctionType *FT = llvm::cast<llvm::FunctionType>(F->getFunctionType());
@@ -2983,6 +3024,24 @@ void CWriter::printFunction(llvm::Function &F) {
 
   printFunctionSignature(&F, false);
   Out << " {\n";
+
+  /* evghenii :: host function emits a call for other function */
+  NVVMAnnotations annotations(m->module);
+  if (annotations.findFunction(&F))
+    if (annotations.getFunctionType() == NVVMAnnotations::HOST)
+    {
+      const llvm::Function *fdev = annotations.getDeviceFunction();
+      const std::string fdevNameStr = fdev->getName().str();
+      Out << "    " << fdevNameStr << "<<<1,32>>>( ";
+      llvm::Function::const_arg_iterator I = F.arg_begin(), E = F.arg_end();
+      for (; I != E; ++I) 
+        Out << GetValueName(I) << ", ";
+      if (F.arg_size() != fdev->arg_size())   /* device function is masked */
+        Out << "true ";
+      Out << ");\n";
+      Out << " }\n";
+      return;
+    }
 
   // If this is a struct return function, handle the result with magic.
   if (isStructReturn) {

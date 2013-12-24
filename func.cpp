@@ -546,6 +546,7 @@ Function::GenerateIR() {
                       av.push_back(appFunction);
                       av.push_back(llvm::MDString::get(*g->ctx, "host"));
                       av.push_back(llvm::ConstantInt::get(llvm::IntegerType::get(*g->ctx,32), 1));
+                      av.push_back(function);
                       annotations->addOperand(llvm::MDNode::get(*g->ctx, av));
                     }
                 }
