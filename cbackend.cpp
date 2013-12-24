@@ -2778,6 +2778,44 @@ void CWriter::printFunctionSignature(const llvm::Function *F, bool Prototype) {
   /// isStructReturn - Should this function actually return a struct by-value?
   bool isStructReturn = F->hasStructRetAttr();
 
+  /* evghenii :: adding CUDA qualifaries for __device__, __global__ & "host" function */
+  llvm::NamedMDNode* annotations =
+    m->module->getNamedMetadata("nvvm.annotations");
+  if (annotations != NULL)
+  {
+    const int n = annotations->getNumOperands();
+    bool is_kernel = false;
+    bool is_host   = false;
+//    fprintf(stderr, " -- found %d annotations \n", n);
+    for (int i = 0; i < n; i++)
+    {
+      const llvm::MDNode *node = annotations->getOperand(i);
+      assert(node != NULL);
+      const int nop = node->getNumOperands();
+ //     fprintf(stderr, " --  %d has %d operands \n", i, nop);
+      assert(nop == 3);
+      const llvm::Function *func = llvm::dyn_cast<llvm::Function>(node->getOperand(0));
+      assert(func != NULL);
+      const llvm::MDString *string = llvm::dyn_cast<llvm::MDString>(node->getOperand(1));
+      assert(string != NULL);
+      const int nchar = string->getLength();
+//      fprintf(stderr, " -- nchar= %d \n", nchar);
+      /* sizeof("host") == 4
+       * sizeof("kernel") == 6 
+       */
+      if (func == F)
+      {
+        if      (nchar == 4) is_host = true;
+        else if (nchar == 6) is_kernel = true;
+        else  assert(0);
+        break;
+      }
+    }
+    if (is_kernel)    Out << "__global__ ";
+    else if (is_host) Out << "/* host */ ";
+    else              Out << "__device__ ";
+  }
+
   if (F->hasLocalLinkage()) Out << "static ";
   if (F->hasDLLImportLinkage()) Out << "__declspec(dllimport) ";
   if (F->hasDLLExportLinkage()) Out << "__declspec(dllexport) ";

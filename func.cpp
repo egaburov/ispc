@@ -332,7 +332,7 @@ Function::emitCode(FunctionEmitContext *ctx, llvm::Function *function,
             ctx->SetFunctionMask(argIter);
             Assert(++argIter == function->arg_end());
         }
-        if (g->target->getISA() == Target::CUDA)
+        if (type->isTask == true && g->target->getISA() == Target::CUDA)
         {
           llvm::NamedMDNode* annotations =
             m->module->getOrInsertNamedMetadata("nvvm.annotations");
@@ -495,6 +495,16 @@ Function::GenerateIR() {
         Assert(type != NULL);
         if (type->isExported) {
             if (!type->isTask) {
+                if (g->target->getISA() == Target::CUDA)
+                {
+                  llvm::NamedMDNode* annotations =
+                    m->module->getOrInsertNamedMetadata("nvvm.annotations");
+                  llvm::SmallVector<llvm::Value*, 3> av;
+                  av.push_back(function);
+                  av.push_back(llvm::MDString::get(*g->ctx, "kernel"));
+                  av.push_back(llvm::ConstantInt::get(llvm::IntegerType::get(*g->ctx,32), 1));
+                  annotations->addOperand(llvm::MDNode::get(*g->ctx, av));
+                }
                 llvm::FunctionType *ftype = type->LLVMFunctionType(g->ctx, true);
                 llvm::GlobalValue::LinkageTypes linkage = llvm::GlobalValue::ExternalLinkage;
                 std::string functionName = sym->name;
@@ -528,8 +538,18 @@ Function::GenerateIR() {
                             FATAL("Function verificication failed");
                         }
                     }
+                    if (g->target->getISA() == Target::CUDA)
+                    {
+                      llvm::NamedMDNode* annotations =
+                        m->module->getOrInsertNamedMetadata("nvvm.annotations");
+                      llvm::SmallVector<llvm::Value*, 3> av;
+                      av.push_back(appFunction);
+                      av.push_back(llvm::MDString::get(*g->ctx, "host"));
+                      av.push_back(llvm::ConstantInt::get(llvm::IntegerType::get(*g->ctx,32), 1));
+                      annotations->addOperand(llvm::MDNode::get(*g->ctx, av));
+                    }
                 }
-            }
+              }
         }
     }
 }
