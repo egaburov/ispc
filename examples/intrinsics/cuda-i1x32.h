@@ -109,27 +109,6 @@ static FORCEINLINE void ISPCSync(uint8_t *handle)
   cudaDeviceSynchronize();
 }
 
-template<typename T>
-struct SharedArray
-{
-  private:
-    T *ptr;
-  public:
-    FORCEINLINE SharedArray(const size_t n)
-    {
-      if (programIndex() == 0)
-        ptr = malloc(n * sizeof(T));
-    }
-    FORCEINLINE ~SharedArray()
-    {
-      if (programIndex() == 0)
-        free(ptr);
-    }
-    const FORCEINLINE T& operator[](const size_t i) const { return ptr[i]; }
-    FORCEINLINE       T& operator[](const size_t i) { return ptr[i]; }
-};
-
-
 /****** shuffle instruction ******/
 
 /* bool, int8_t, int16_t, int32_t */
@@ -163,6 +142,33 @@ static FORCEINLINE int64_t __shuffle(const int64_t _v, const int32_t index)
       __shfl(__double2loint(v), index)));
 }
 
+
+/**** shared storage ****/
+
+template<typename T>
+struct SharedArray
+{
+  private:
+    T *ptr;
+  public:
+    FORCEINLINE SharedArray(const size_t n)
+    {
+      if (programIndex() == 0)
+        ptr = (T*)malloc(n * sizeof(T));
+      uint64_t ptr_i64 = (uint64_t)ptr;
+      ptr_i64 = __shuffle(ptr_i64,0);
+      ptr = (T*)ptr_i64;
+    }
+    FORCEINLINE ~SharedArray()
+    {
+      if (programIndex() == 0)
+        free(ptr);
+    }
+    const FORCEINLINE T& operator[](const size_t i) const { return ptr[i]; }
+    FORCEINLINE       T& operator[](const size_t i) { return ptr[i]; }
+    FORCEINLINE operator T*() { return ptr; }
+    FORCEINLINE operator const T*() const { return ptr; }
+};
 
 /***** reductions *****/
 
@@ -1673,4 +1679,51 @@ static FORCEINLINE uint64_t __clock() {
   return (uint64_t)high << 32 | low;
 }
 #endif
+
+/*** new/delete ****/
+
+static FORCEINLINE uint8_t* __new_uniform_64rt(uint64_t size)
+{
+  uint8_t* ptr;
+  if (programIndex() == 0)
+    ptr = static_cast<uint8_t*>(malloc(size));
+  uint64_t ptr_i64 = (uint64_t)ptr;
+  ptr_i64 = __shuffle<uint64_t>(ptr_i64,0);
+  ptr = (uint8_t*)ptr_i64;
+  return ptr;
+}
+static FORCEINLINE void __delete_uniform_64rt(uint8_t *ptr)
+{
+  if (programIndex() == 0)
+    delete ptr;
+}
+static FORCEINLINE __vec32_i64 __new_varying32_64rt(__vec32_i32 size,  __vec32_i1 mask)
+{
+  __vec32_i64 ptr_i64(0);
+  if (mask.v)
+  {
+    uint8_t* ptr = (uint8_t*)malloc(size.v);
+    ptr_i64.v = (uint64_t)ptr;
+  }
+  return ptr_i64;
+}
+static FORCEINLINE __vec32_i64 __new_varying64_64rt(__vec32_i64 size,  __vec32_i1 mask)
+{
+  __vec32_i64 ptr_i64(0);
+  if (mask.v)
+  {
+    uint8_t* ptr = (uint8_t*)malloc(size.v);
+    ptr_i64.v = (uint64_t)ptr;
+  }
+  return ptr_i64;
+}
+static FORCEINLINE void __delete_varying_64rt(__vec32_i64 ptr_i64, __vec32_i1 mask)
+{
+  if (mask.v)
+  {
+    uint8_t* ptr = (uint8_t*)ptr_i64.v;
+    delete(ptr);
+  }
+}
+
 

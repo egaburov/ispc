@@ -2840,16 +2840,11 @@ ifelse(BUILD_OS, `UNIX',
 ifelse(RUNTIME, `32',
 `
 
-;; Unix 32 bit environment.
-;; Use: posix_memalign and free
-;; Define:
+;; Declare::
 ;; - __new_uniform_32rt
 ;; - __new_varying32_32rt
 ;; - __delete_uniform_32rt
 ;; - __delete_varying_32rt
-
-declare i32 @posix_memalign(i8**, i32, i32)
-declare void @free(i8 *)
 
 declare noalias i8 * @__new_uniform_32rt(i64 %size)
 declare <WIDTH x i64> @__new_varying32_32rt(<WIDTH x i32> %size, <WIDTH x MASK> %mask);
@@ -2860,20 +2855,14 @@ declare void @__delete_varying_32rt(<WIDTH x i64> %ptr, <WIDTH x MASK> %mask)
 RUNTIME, `64',
 `
 
-;; Unix 64 bit environment.
-;; Use: posix_memalign and free
-;; Define:
+;; Declare:
 ;; - __new_uniform_64rt
 ;; - __new_varying32_64rt
 ;; - __new_varying64_64rt
 ;; - __delete_uniform_64rt
 ;; - __delete_varying_64rt
 
-declare i32 @posix_memalign(i8**, i64, i64)
-declare void @free(i8 *)
-
 declare noalias i8 * @__new_uniform_64rt(i64 %size)
-
 declare <WIDTH x i64> @__new_varying32_64rt(<WIDTH x i32> %size, <WIDTH x MASK> %mask)
 declare <WIDTH x i64> @__new_varying64_64rt(<WIDTH x i64> %size, <WIDTH x MASK> %mask)
 declare void @__delete_uniform_64rt(i8 * %ptr) 

@@ -878,6 +878,7 @@ llvm::raw_ostream &CWriter::printType(llvm::raw_ostream &Out, llvm::Type *Ty,
     Out << "struct " << NameSoFar << " {\n";
 
     // print initialization func
+    if (g->target->getISA() != Target::CUDA) /* evghenii */
     if (STy->getNumElements() > 0) {
         Out << "  static " << NameSoFar << " init(";
         unsigned Idx = 0;
@@ -937,20 +938,24 @@ llvm::raw_ostream &CWriter::printType(llvm::raw_ostream &Out, llvm::Type *Ty,
     // value semantics (avoiding the array "decay").
     Out << "struct " << NameSoFar << " {\n";
     // init func
-    Out << "  static " << NameSoFar << " init(";
-    for (unsigned Idx = 0; Idx < NumElements; ++Idx) {
+    /* evghenii */
+    if (g->target->getISA() != Target::CUDA)
+    {
+      Out << "  static " << NameSoFar << " init(";
+      for (unsigned Idx = 0; Idx < NumElements; ++Idx) {
         char buf[64];
         sprintf(buf, "v%d", Idx);
         printType(Out, ATy->getElementType(), false, buf);
         if (Idx + 1 < NumElements)
-            Out << ", ";
-    }
-    Out << ") {\n";
-    Out << "    " << NameSoFar << " ret;\n";
-    for (unsigned Idx = 0; Idx < NumElements; ++Idx)
+          Out << ", ";
+      }
+      Out << ") {\n";
+      Out << "    " << NameSoFar << " ret;\n";
+      for (unsigned Idx = 0; Idx < NumElements; ++Idx)
         Out << "    ret.array[" << Idx << "] = v" << Idx << ";\n";
-    Out << "    return ret;\n";
-    Out << "  }\n  ";
+      Out << "    return ret;\n";
+      Out << "  }\n  ";
+    }
 
     // if it's an array of i8s, also provide a version that takes a const
     // char *
@@ -974,8 +979,14 @@ llvm::raw_ostream &CWriter::printType(llvm::raw_ostream &Out, llvm::Type *Ty,
         ATy->getElementType() == LLVMTypes::DoubleType)
     {
       Out << "SharedArray<";
+#if 0
       printType(Out, ATy->getElementType(), false,
           "> array(" + llvm::utostr(NumElements) + ")");
+#else
+      printType(Out, ATy->getElementType(), false,
+          "> array;\n"); // (" + llvm::utostr(NumElements) + ")");
+      Out << "  __device__ " << NameSoFar << "() : array(" << llvm::utostr(NumElements) << ") {}";
+#endif
     }
     else
     {
