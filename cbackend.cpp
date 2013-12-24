@@ -3060,7 +3060,7 @@ void CWriter::printFunction(llvm::Function &F) {
     if (annotations.getFunctionType() == NVVMAnnotations::HOST)
     {
       const llvm::Function *fdev = annotations.getDeviceFunction();
-      const std::string fdevNameStr = fdev->getName().str();
+      const std::string fdevNameStr = CBEMangle(fdev->getName().str().c_str());
       Out << "  " << fdevNameStr << "<<<1,32>>>( ";
       llvm::Function::const_arg_iterator I = F.arg_begin(), E = F.arg_end();
       for (; I != E; ++I) 
