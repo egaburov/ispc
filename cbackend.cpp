@@ -971,9 +971,9 @@ llvm::raw_ostream &CWriter::printType(llvm::raw_ostream &Out, llvm::Type *Ty,
         ATy->getElementType() == LLVMTypes::FloatType ||
         ATy->getElementType() == LLVMTypes::DoubleType)
     {
-      Out << "  SharedArray<";
+      Out << "SharedArray<";
       printType(Out, ATy->getElementType(), false,
-          " > array(" + llvm::utostr(NumElements) + ")");
+          "> array(" + llvm::utostr(NumElements) + ")");
     }
     else
     {

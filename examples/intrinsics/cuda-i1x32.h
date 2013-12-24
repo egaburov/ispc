@@ -109,6 +109,26 @@ static FORCEINLINE void ISPCSync(uint8_t *handle)
   cudaDeviceSynchronize();
 }
 
+template<typename T>
+struct SharedArray
+{
+  private:
+    T *ptr;
+  public:
+    FORCEINLINE SharedArray(const size_t n)
+    {
+      if (programIndex() == 0)
+        ptr = malloc(n * sizeof(T));
+    }
+    FORCEINLINE ~SharedArray()
+    {
+      if (programIndex() == 0)
+        free(ptr);
+    }
+    const FORCEINLINE T& operator[](const size_t i) const { return ptr[i]; }
+    FORCEINLINE       T& operator[](const size_t i) { return ptr[i]; }
+};
+
 
 /****** shuffle instruction ******/
 
