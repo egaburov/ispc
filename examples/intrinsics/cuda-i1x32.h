@@ -33,6 +33,8 @@
 
 #define FORCEINLINE __device__ __forceinline__
 
+#define int64_t long long
+#define uint64_t unsigned long long
 typedef bool bool_t;
 typedef bool_t __vec1_i1;
 typedef float __vec1_f;
@@ -82,6 +84,29 @@ static FORCEINLINE int32_t __blockIndex()
 static FORCEINLINE int32_t __blockCount()
 {
   return __blockCount0()*__blockCount1()*__blockCount2();
+}
+
+static FORCEINLINE uint8_t* ISPCAlloc(uint8_t **handle, uint64_t align, uint64_t size)
+{
+  uint8_t *ptr = NULL;
+  if (programIndex() == 0)
+    ptr = static_cast<uint8_t*>(cudaGetParameterBuffer(align, size));
+  return ptr;
+}
+static FORCEINLINE void ISPCLaunch(uint8_t **handle, uint8_t *func, uint8_t *params, uint32_t ntx, uint32_t nty, uint32_t ntz)
+{
+  const int nbx = (ntx+4-1)/4;
+  const int nby =  nty;
+  const int nbz =  ntz;
+  const int sharedMemSize = 0;
+  const cudaStream_t stream(0);
+
+  if (programIndex() == 0)
+      cudaLaunchDevice(func, params, dim3(nbx,nby,nbz), dim3(128,1,1), sharedMemSize, stream);
+}
+static FORCEINLINE void ISPCSync(uint8_t *handle)
+{
+  cudaDeviceSynchronize();
 }
 
 
