@@ -962,8 +962,24 @@ llvm::raw_ostream &CWriter::printType(llvm::raw_ostream &Out, llvm::Type *Ty,
         Out << "  }\n";
     }
 
-    printType(Out, ATy->getElementType(), false,
-              "array[" + llvm::utostr(NumElements) + "]");
+    std::string type;
+    if (ATy->getElementType() == LLVMTypes::BoolType ||
+        ATy->getElementType() == LLVMTypes::Int8Type ||
+        ATy->getElementType() == LLVMTypes::Int16Type ||
+        ATy->getElementType() == LLVMTypes::Int32Type ||
+        ATy->getElementType() == LLVMTypes::Int64Type ||
+        ATy->getElementType() == LLVMTypes::FloatType ||
+        ATy->getElementType() == LLVMTypes::DoubleType)
+    {
+      Out << "  SharedArray<";
+      printType(Out, ATy->getElementType(), false,
+          " > array(" + llvm::utostr(NumElements) + ")");
+    }
+    else
+    {
+      printType(Out, ATy->getElementType(), false,
+          "array[" + llvm::utostr(NumElements) + "]");
+    }
     return Out << ";\n} ";
   }
 
