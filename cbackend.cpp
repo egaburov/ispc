@@ -878,7 +878,7 @@ llvm::raw_ostream &CWriter::printType(llvm::raw_ostream &Out, llvm::Type *Ty,
     Out << "struct " << NameSoFar << " {\n";
 
     // print initialization func
-    if (g->target->getISA() != Target::CUDA) /* evghenii */
+//    if (g->target->getISA() != Target::CUDA) /* evghenii */
     if (STy->getNumElements() > 0) {
         Out << "  static " << NameSoFar << " init(";
         unsigned Idx = 0;
@@ -939,7 +939,7 @@ llvm::raw_ostream &CWriter::printType(llvm::raw_ostream &Out, llvm::Type *Ty,
     Out << "struct " << NameSoFar << " {\n";
     // init func
     /* evghenii */
-    if (g->target->getISA() != Target::CUDA)
+//    if (g->target->getISA() != Target::CUDA)
     {
       Out << "  static " << NameSoFar << " init(";
       for (unsigned Idx = 0; Idx < NumElements; ++Idx) {
@@ -959,7 +959,7 @@ llvm::raw_ostream &CWriter::printType(llvm::raw_ostream &Out, llvm::Type *Ty,
 
     // if it's an array of i8s, also provide a version that takes a const
     // char *
-    if (g->target->getISA() != Target::CUDA)
+//    if (g->target->getISA() != Target::CUDA)
       if (ATy->getElementType() == LLVMTypes::Int8Type) {
         Out << "  static " << NameSoFar << " init(const char *p) {\n";
         Out << "    " << NameSoFar << " ret;\n";
@@ -1690,7 +1690,7 @@ void CWriter::printConstant(llvm::Constant *CPV, bool Static) {
     if (!Static) {
       // call init func...
       printType(Out, CPV->getType());
-      Out << "::init";
+      Out << " /* ev */ ::init";
     }
     if (llvm::isa<llvm::ConstantAggregateZero>(CPV) || llvm::isa<llvm::UndefValue>(CPV)) {
       llvm::StructType *ST = llvm::cast<llvm::StructType>(CPV->getType());
@@ -3099,7 +3099,7 @@ void CWriter::printFunction(llvm::Function &F) {
                !isInlinableInst(*I)) {
       Out << "  ";
       printType(Out, I->getType(), false, GetValueName(&*I));
-      Out << ";\n";
+      Out << "; /* shooshshoosh */\n";
 
       if (llvm::isa<llvm::PHINode>(*I)) {  // Print out PHI node temporaries as well...
         Out << "  ";
